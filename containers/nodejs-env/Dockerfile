@@ -2,6 +2,8 @@
 FROM nvidia/cuda:11.2.2-devel-ubuntu20.04
 #FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
 
+RUN rm /bin/sh && ln -s /bin/bash /bin/sh
+
 
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 
