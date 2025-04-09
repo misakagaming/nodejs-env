@@ -79,6 +79,8 @@ RUN node -v
 
 RUN curl https://raw.githubusercontent.com/creationix/nvm/master/install.sh | bash
 
+RUN source ~/.bashrc
+
 
 RUN ln -sf $(which python$PYTHON_VERSION) /usr/bin/python
 
