@@ -61,9 +61,7 @@ RUN python3 -m virtualenv --help
 
 #RUN python3.6 -m pip install --upgrade Pillow
 
-RUN node -v
 
-RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
 
 
 # ======================== START OF ADDITIONAL INSTALLATION ========================
@@ -77,7 +75,9 @@ RUN apt-get update && \
     git \
     default-jdk
   
+RUN node -v
 
+RUN curl https://raw.githubusercontent.com/creationix/nvm/master/install.sh | bash
 
 
 RUN ln -sf $(which python$PYTHON_VERSION) /usr/bin/python
