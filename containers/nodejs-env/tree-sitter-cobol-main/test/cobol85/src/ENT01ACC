@@ -1,0 +1,5013 @@
+*-------------------------------------------------------------------*
+*creation date :21/06/2010                                          *
+*created by m.turkmen                                               *
+*PTT merkezlerinin POSTANET2004 projesi kapsaminda yaptiklari       *
+*islemlerin muhasebe hesaplarina otomatik olarak yansitilmasini     *
+*saglayan programdir.                                               *
+*                                                                   *
+*                                                                   *
+*                                                                   *
+*                                                                   *
+*-------------------------------------------------------------------*
+?env common
+?SQL
+?HEADING "ENT01SC"
+?SYMBOLS, INSPECT
+?highpin
+?SAVEABEND
+?SEARCH $DATA18.MUHOBJ.SFSIRAO
+?SEARCH $DATA18.MUHOBJ.SEFSIRAO
+?SEARCH $DATA18.MUHOBJ.SFISBASO
+?SEARCH $DATA18.MUHOBJ.SFISDETO
+?SEARCH $DATA18.MUHOBJ.SHESPLAO
+?SEARCH $DATA18.MUHOBJ.SBAKKNTO
+?SEARCH $DATA18.MUHOBJ.SENTHESO
+?SEARCH $DATA18.MUHOBJ.SENTYHSO
+*?SEARCH $DATA18.MUHOBJ.SHOZTHSO
+?SEARCH $DATA18.MUHOBJ.SHESNOO
+*?SEARCH $DATA18.MUHOBJ.SACENTEO
+*
+ IDENTIFICATION DIVISION.
+ PROGRAM-ID. ENT01SO IS INITIAL PROGRAM.
+ ENVIRONMENT DIVISION.
+ CONFIGURATION SECTION.
+ SPECIAL-NAMES.
+     FILE "$SYSTEM.SYSTEM.COBOLLIB" IS COBOLLIB,
+     FILE "$SYSTEM.SYSTEM.CBL85UTL" IS CBL85UTL.
+ INPUT-OUTPUT SECTION.
+ FILE-CONTROL.
+ DATA DIVISION.
+ FILE SECTION.
+*
+*******************************************************************************
+*
+ WORKING-STORAGE SECTION.
+*
+ 01 WS-PARAMETER-HATA.
+    03 WS-SOURCE-CODE-NAME   PIC X(08).
+    03 WS-HATA-TABLE-NAME    PIC X(15).
+    03 WS-HATA-CURSOR-NAME   PIC X(15).
+    03 WS-HATA-MESAJI-TIPI   PIC X(20).
+    03 WS-HATA-MESAJI        PIC X(100).
+    03 WS-HATA-SUBPROG-NAME  PIC X(08).
+ 01 WS-PARAMETER-FLAG.
+    03 WS-ERROR-FLAG            PIC X(01).
+       88 WS-FATAL-ERROR        VALUE "1".
+    03 WS-FLAG4                 PIC X(01).
+       88 WS-KDV-VAR-FLAG       VALUE "1".
+    03 WS-FLAG5                 PIC X(01).
+       88 WS-KDV-DAHIL-FLAG     VALUE "1".
+    03 WS-FLAG6                 PIC X(01).
+       88 WS-KDV-HARIC-FLAG     VALUE "1".
+    03 WS-FLAG7                 PIC X(01).
+       88 WS-KOMISYON-VAR-FLAG  VALUE "1".
+    03 WS-FLAG8                 PIC X(01).
+       88 WS-DOVIZ-FLAG         VALUE "1".
+    03 WS-FLAG9                 PIC X(01).
+       88 WS-BASARISIZ-FLAG     VALUE "1".
+    03 WS-FLAG10                PIC X(01).
+       88 WS-CURSOR-ACIK-FLAG   VALUE "1".
+    03 WS-FLAG11                     PIC X(01).
+       88 WS-TRANSACTION-BITIR-FLAG  VALUE "1".
+    03 WS-FLAG12                     PIC X(01).
+       88 WS-KONSINYE-FLAG           VALUE "1".
+    03 WS-FLAG13                     PIC X(01).
+       88 WS-YENI-SUBE-FLAG          VALUE "1".
+    03 WS-FLAG14                     PIC X(01).
+       88 WS-ACENTE-ROW-DEVAM-FLAG   VALUE "1".
+    03 WS-FLAG15                     PIC X(01).
+       88 WS-BSMV-FLAG               VALUE "1".
+    03 WS-FLAG16                    PIC X(01).
+       88 WS-DVS-FLAG               VALUE "1".
+ 01 RECEIVE-FILE-STATUS.
+    02 RECEIVE-FILE-STAT-1           PIC 9(01) VALUE 0.
+    02 RECEIVE-FILE-STAT-2           PIC 9(01) VALUE 0.
+ 01 REC-FILE-STAT REDEFINES RECEIVE-FILE-STATUS PIC 9(02).
+    88 RECEIVE-FILE-OK               VALUE 0.
+    88 RECEIVE-FILE-EOF              VALUE 10.
+ 01 WS-VARIAB-INIT.
+    03 I-SAY                         PIC 9(04).
+    03 K-SAY                         PIC 9(04).
+    03 L-SAY                         PIC 9(04).
+    03 J-SAY                         PIC 9(03).
+    03 WS-DON-MSG                    PIC 9(01).
+    03 OK-MSG                        PIC 9(01).
+    03 OK-MSG-ENT                    PIC 9(01).
+    03 OK-MESSAGE                    PIC 9(01).
+    03 WS-ILKMI                      PIC 9(04).
+    03 WS-MERKEZ-ADET                PIC 9(07).
+    03 WS-TEMP-TUTAR                 PIC S9(16)V99.
+    03 WS-TOPLAM-KDVLI-TUTAR         PIC S9(16)V99.
+    03 WS-KDV-TUTAR                  PIC S9(16)V99.
+    03 WS-TOPLAM-BORC-TUTAR          PIC S9(16)V99.
+    03 WS-TOPLAM-ALACAK-TUTAR        PIC S9(16)V99.
+    03 WS-DETAY-SIRA-NO              PIC 9(03).
+    03 WS-TEMP-REF-NO                PIC X(12).
+    03 WS-KESILEN-KDV                PIC S9(16)V99.
+    03 WS-KDV-HESAP-ADET             PIC 9(01).
+    03 WS-CURRENT-DATE               PIC 9(08).
+    03 WS-VALOR-TARIHI               PIC 9(08).
+    03 WS-DEKONT-HESAP               PIC X(03).
+    03 WS-ARACI-HESAP                PIC X(03).
+    03 WS-KDV-HESAP-REF-NO           PIC X(12).
+    03 WS-ADET                       PIC 9(04).
+    03 WS-ADET-MERKEZ                PIC 9(04).
+    03 WS-HESAP-REF-NO               PIC X(12).
+    03 WS-FIS-TURU                   PIC X(03).
+    03 WS-FIS-ACIKLAMA               PIC X(255).
+    03 WS-BORC-TUTAR                 PIC S9(16)V99.
+    03 WS-ALACAK-TUTAR               PIC S9(16)V99.
+    03 WS-DGT-KODU                   PIC X(03).
+    03 DON-MSG                       PIC 9(01).
+    03 DON-MSG-1                     PIC 9(01).
+    03 WS-RESPONSE-CODE              PIC X(04).
+    03 WS-RESPONSE-COUNTER           PIC X(02).
+    03 WS-DOVIZ-MIKTAR               PIC S9(16)V99.
+    03 WS-DOVIZ-KURU                 PIC S9(13)V9(05).
+    03 WS-ODEME-KODU                 PIC X(03).
+    03 WS-ACENTE-ALACAKLARI-REF      PIC X(12).
+ 01 WS-KURULUS-KODU                  PIC 9(01) VALUES 1.
+ 01 WS-ACENTE-ALACAKLARI-REF1         PIC X(12) VALUES "120040000018".
+ 01 WS-ACENTE-ALACAKLARI-REF2         PIC X(12) VALUES "328040001556".
+ 01 WS-ACENTE-ALACAKLARI-REF3         PIC X(12) values "120050000292".
+ 01 WS-ACENTE-ALACAKLARI-REF4         PIC X(12) values "120050000296".
+* gercek ortam ref_no N-kolay
+ 01 WS-ACENTE-ALACAKLARI-REF5         PIC X(12) values "120050000360".
+ 01 WS-ACENTE-ALACAKLARI-REF7         PIC X(12) values "108040000002".
+ 01 WS-ACENTE-ALACAKLARI-REF8         PIC X(12) values "120050000391".
+ 01 WS-ACENTE-ALACAKLARI-REF9         PIC X(12) values "120050000390".
+ 01 WS-ACENTE-ALACAKLARI-REF10        PIC X(12) values "108050000030".
+* Mobil Bankacýlýk Kanalý ile HGS yükleme
+ 01 WS-ACENTE-ALACAKLARI-REF11        PIC X(12) values "108050000030".
+ 01 WS-GISE-FIS-ACIKLAMA             PIC X(255) VALUES
+ "POSTANET SUBE/GISE ENTEGRASYONU (OTOMATIK)".
+ 01 WS-ATM-FIS-ACIKLAMA              PIC X(255) VALUES
+ "POSTANET ATM/GISE ENTEGRASYONU (OTOMATIK)".
+ 01 WS-ACENTE-FIS-ACIKLAMA1          PIC X(255) VALUES
+ "POSTANET ACENTE ENTEGRASYONU (OTOMATIK)".
+ 01 WS-ACENTE-FIS-ACIKLAMA2          PIC X(255) VALUES
+ "POSTANET TAHSILAT ACENTELIGI ENTEGRASYONU (OTOMATIK)".
+ 01 WS-ACENTE-FIS-ACIKLAMA3          PIC X(255) VALUES
+ "POSTANET N-KOLAY  ACENTELIGI ENTEGRASYONU (OTOMATIK)".
+ 01 WS-ACENTE-FIS-ACIKLAMA4          PIC X(255) VALUES
+ "PTTEM SANAL  ACENTELIK ENTEGRASYONU (OTOMATIK)".
+ 01 WS-ACENTE-FIS-ACIKLAMA5          PIC X(255) VALUES
+  "ELEKSE TAHSILAT ACENTELIK ENTEGRASYONU (OTOMATIK)".
+  01 WS-SUBPROG-VARIAB.
+    03 WS-SHESPLA-KURULUS-KODU       PIC 9(01).
+    03 WS-SHESPLA-HES-REF-NO         PIC X(12).
+    03 WS-SHESPLA-KONTROL-FLAG       PIC X(03).
+    03 WS-SHESPLA-SYS-ERR            PIC S9(04).
+    03 WS-SHESPLA-SQL-ERR            PIC S9(04).
+    03 WS-SHESNO-KURULUS-KODU        PIC 9(01).
+    03 WS-SHESNO-HES-REF-NO          PIC X(12).
+    03 WS-SHESNO-HESAP-NO            PIC X(39).
+    03 WS-SHESNO-SYS-ERR             PIC S9(04).
+    03 WS-SHESNO-SQL-ERR             PIC S9(04).
+    03 WS-SFSIRA-KURULUS-KODU        PIC 9(01).
+    03 WS-SFSIRA-BOLGE-KODU          PIC 9(03).
+    03 WS-SFSIRA-MERKEZ-NO           PIC 9(05).
+    03 WS-SFSIRA-SUBE-NO             PIC 9(03).
+    03 WS-SFSIRA-GISE-NO             PIC 9(04).
+    03 WS-SFSIRA-FIS-TURU            PIC X(03).
+    03 WS-SFSIRA-SIRA-NO             PIC 9(07).
+    03 WS-SFSIRA-SYS-ERR             PIC S9(04).
+    03 WS-SFSIRA-SQL-ERR             PIC S9(04).
+    03 WS-SEFSIRA-KURULUS-KODU       PIC 9(01).
+    03 WS-SEFSIRA-BOLGE-KODU         PIC 9(03).
+    03 WS-SEFSIRA-MERKEZ-NO          PIC 9(05).
+    03 WS-SEFSIRA-SUBE-NO            PIC 9(03).
+    03 WS-SEFSIRA-GISE-NO            PIC 9(04).
+    03 WS-SEFSIRA-FIS-TURU           PIC X(03).
+    03 WS-SEFSIRA-YIL                PIC 9(04).
+    03 WS-SEFSIRA-AY                 PIC 9(02).
+    03 WS-SEFSIRA-GUN                PIC 9(02).
+    03 WS-SEFSIRA-SIRA-NO            PIC 9(07).
+    03 WS-SEFSIRA-SYS-ERR            PIC S9(04).
+    03 WS-SEFSIRA-SQL-ERR            PIC S9(04).
+    03 WS-SFISBAS-KURULUS-KODU       PIC 9(01).
+    03 WS-SFISBAS-BOLGE-KODU         PIC 9(03).
+    03 WS-SFISBAS-MERKEZ-NO          PIC 9(05).
+    03 WS-SFISBAS-SUBE-NO            PIC 9(03).
+    03 WS-SFISBAS-GISE-NO            PIC 9(04).
+    03 WS-SFISBAS-ISLEM-YIL          PIC 9(04).
+    03 WS-SFISBAS-ISLEM-AY           PIC 9(02).
+    03 WS-SFISBAS-ISLEM-GUN          PIC 9(02).
+    03 WS-SFISBAS-FIS-TURU           PIC X(03).
+    03 WS-SFISBAS-FIS-NO             PIC 9(07).
+    03 WS-SFISBAS-ISLEM-ID           PIC S9(12).
+    03 WS-SFISBAS-FIS-ACIKLAMA       PIC X(255).
+    03 WS-SFISBAS-KARSI-BOLGE-KODU   PIC 9(03).
+    03 WS-SFISBAS-KARSI-MERKEZ-NO    PIC 9(05).
+    03 WS-SFISBAS-KARSI-BELGE-YIL    PIC 9(04).
+    03 WS-SFISBAS-KARSI-BELGE-AY     PIC 9(02).
+    03 WS-SFISBAS-KARSI-BELGE-GUN    PIC 9(02).
+    03 WS-SFISBAS-KARSI-BELGE-TURU   PIC X(03).
+    03 WS-SFISBAS-KARSI-BELGE-NO     PIC 9(07).
+    03 WS-SFISBAS-KASA-ONAY          PIC X(02).
+    03 WS-SFISBAS-FIS-STATUS         PIC 9(01).
+    03 WS-SFISBAS-VALOR-YIL          PIC 9(04).
+    03 WS-SFISBAS-VALOR-AY           PIC 9(02).
+    03 WS-SFISBAS-VALOR-GUN          PIC 9(02).
+    03 WS-SFISBAS-MADDE-NO           PIC 9(07).
+    03 WS-SFISBAS-DEFTER             PIC 9(01).
+    03 WS-SFISBAS-EKL-SICIL-NO       PIC S9(11).
+    03 WS-SFISBAS-KONTROL-FLAG       PIC X(05).
+    03 WS-SFISBAS-HATA-MESAJI        PIC X(100).
+    03 WS-SFISBAS-SYS-ERR            PIC S9(04).
+    03 WS-SFISBAS-SQL-ERR            PIC S9(04).
+    03 WS-SFISDET-KURULUS-KODU       PIC 9(01).
+    03 WS-SFISDET-BOLGE-KODU         PIC 9(03).
+    03 WS-SFISDET-MERKEZ-NO          PIC 9(05).
+    03 WS-SFISDET-SUBE-NO            PIC 9(03).
+    03 WS-SFISDET-GISE-NO            PIC 9(04).
+    03 WS-SFISDET-ISLEM-YIL          PIC 9(04).
+    03 WS-SFISDET-ISLEM-AY           PIC 9(02).
+    03 WS-SFISDET-ISLEM-GUN          PIC 9(02).
+    03 WS-SFISDET-FIS-TURU           PIC X(03).
+    03 WS-SFISDET-FIS-NO             PIC 9(07).
+    03 WS-SFISDET-HESAP-REF-NO       PIC X(12).
+    03 WS-SFISDET-FIS-ACIKLAMA       PIC X(255).
+    03 WS-SFISDET-SIRA-NO            PIC 9(07).
+    03 WS-SFISDET-DGT-TIPI           PIC X(02).
+    03 WS-SFISDET-DGT-KODU           PIC X(03).
+    03 WS-SFISDET-YRD-KART-NO        PIC X(20).
+    03 WS-SFISDET-YRD-KART-TIPI      PIC X(02).
+    03 WS-SFISDET-BORC-TUTAR         PIC S9(16)V99.
+    03 WS-SFISDET-ALACAK-TUTAR       PIC S9(16)V99.
+    03 WS-SFISDET-KARSI-DGT-TIPI     PIC X(02).
+    03 WS-SFISDET-KARSI-DGT-KODU     PIC X(03).
+    03 WS-SFISDET-KUR                PIC S9(13)V9(5).
+    03 WS-SFISDET-DOVIZ-MIKTAR       PIC S9(16)V99.
+    03 WS-SFISDET-ODEME-KODU         PIC X(05).
+    03 WS-SFISDET-FIS-STATUS         PIC 9(01).
+    03 WS-SFISDET-ISLEM-ID           PIC S9(12).
+    03 WS-SFISDET-YEVMIYE-SATIR-NO    PIC S9(14).
+    03 WS-SFISDET-BELGE-TURU          PIC 9(03).
+    03 WS-SFISDET-BELGE-NO            PIC X(255).
+    03 WS-SFISDET-BELGE-YIL           PIC 9(04).
+    03 WS-SFISDET-BELGE-AY            PIC 9(02).
+    03 WS-SFISDET-BELGE-GUN           PIC 9(02).
+    03 WS-SFISDET-ODEME-TURU          PIC 9(02).
+    03 WS-SFISDET-EKL-SICIL-NO       PIC S9(11).
+    03 WS-SFISDET-KONTROL-FLAG       PIC X(05).
+    03 WS-SFISDET-HATA-MESAJI        PIC X(100).
+    03 WS-SFISDET-SYS-ERR            PIC S9(04).
+    03 WS-SFISDET-SQL-ERR            PIC S9(04).
+    03 WS-SOZTHES-KURULUS-KODU       PIC 9(01).
+    03 WS-SOZTHES-BOLGE-KODU         PIC 9(03).
+    03 WS-SOZTHES-MERKEZ-NO          PIC 9(05).
+    03 WS-SOZTHES-SUBE-NO            PIC 9(03).
+    03 WS-SOZTHES-GISE-NO            PIC 9(04).
+    03 WS-SOZTHES-ISLEM-YIL          PIC 9(04).
+    03 WS-SOZTHES-ISLEM-AY           PIC 9(02).
+    03 WS-SOZTHES-ISLEM-GUN          PIC 9(02).
+    03 WS-SOZTHES-HESAP-REF-NO       PIC X(12).
+    03 WS-SOZTHES-FIS-TURU           PIC X(03).
+    03 WS-SOZTHES-BORC-TUTAR         PIC S9(16)V99.
+    03 WS-SOZTHES-ALACAK-TUTAR       PIC S9(16)V99.
+    03 WS-SOZTHES-SICIL-NO           PIC S9(11).
+    03 WS-SOZTHES-KONTROL-FLAG       PIC X(05).
+    03 WS-SOZTHES-SYS-ERR            PIC S9(04).
+    03 WS-SOZTHES-SQL-ERR            PIC S9(04).
+    03 WS-SENTYHS-KURULUS-KODU       PIC 9(01).
+    03 WS-SENTYHS-BOLGE-KODU         PIC 9(03).
+    03 WS-SENTYHS-MERKEZ-NO          PIC 9(05).
+    03 WS-SENTYHS-SUBE-NO            PIC 9(03).
+    03 WS-SENTYHS-GISE-NO            PIC 9(04).
+    03 WS-SENTYHS-ISLEM-YIL          PIC 9(04).
+    03 WS-SENTYHS-ISLEM-AY           PIC 9(02).
+    03 WS-SENTYHS-ISLEM-GUN          PIC 9(02).
+    03 WS-SENTYHS-HESAP-REF-NO       PIC X(12).
+    03 WS-SENTYHS-YRD-KART-NO        PIC X(20).
+    03 WS-SENTYHS-YRD-KART-TIPI      PIC X(02).
+    03 WS-SENTYHS-BORC-TUTAR         PIC S9(16)V99.
+    03 WS-SENTYHS-ALACAK-TUTAR       PIC S9(16)V99.
+    03 WS-SENTYHS-SICIL-NO           PIC S9(11).
+    03 WS-SENTYHS-KONTROL-FLAG       PIC X(05).
+    03 WS-SENTYHS-SYS-ERR            PIC S9(04).
+    03 WS-SENTYHS-SQL-ERR            PIC S9(04).
+*    03 WS-SHOZTHS-KURULUS-KODU       PIC 9(01).
+*    03 WS-SHOZTHS-BOLGE-KODU         PIC 9(03).
+*    03 WS-SHOZTHS-MERKEZ-NO          PIC 9(05).
+*    03 WS-SHOZTHS-SUBE-NO            PIC 9(03).
+*    03 WS-SHOZTHS-GISE-NO            PIC 9(04).
+*   03 WS-SHOZTHS-ISLEM-YIL          PIC 9(04).
+*    03 WS-SHOZTHS-ISLEM-AY           PIC 9(02).
+*    03 WS-SHOZTHS-ISLEM-GUN          PIC 9(02).
+*    03 WS-SHOZTHS-HESAP-REF-NO       PIC X(12).
+*    03 WS-SHOZTHS-FIS-TURU           PIC X(03).
+*    03 WS-SHOZTHS-HIZMET-TURU        PIC 9(02).
+*    03 WS-SHOZTHS-BORC-TUTAR         PIC S9(16)V99.
+*    03 WS-SHOZTHS-ALACAK-TUTAR       PIC S9(16)V99.
+*    03 WS-SHOZTHS-SICIL-NO           PIC S9(11).
+*    03 WS-SHOZTHS-KONTROL-FLAG       PIC X(05).
+*    03 WS-SHOZTHS-SYS-ERR            PIC S9(04).
+*    03 WS-SHOZTHS-SQL-ERR            PIC S9(04).
+    03 WS-ONCEKI-FIS-SIRA-NO         PIC 9(07).
+    03 WS-ONCEKI-FIS-TURU            PIC X(03).
+    03 WS-GUNUN-TARIHI               PIC 9(08).
+    03 WS-ISLEM-TARIHI.
+       05 WS-ISLEM-YIL               PIC 9(04).
+       05 WS-ISLEM-AY                PIC 9(02).
+       05 WS-ISLEM-GUN               PIC 9(02).
+    03 WS-ISLEM-TARIHI-INTEGER       PIC 9(08).
+    03 WS-YRDKART-ACIKLAMA           PIC X(100).
+    03 WS-YRDKART-UNVAN              PIC X(30).
+    03 WS-KAYITVAR-FLAG              PIC 9(01).
+ EXTENDED-STORAGE SECTION.
+
+ 01 WS-ENTEG-MERKEZ-VALUES.
+    03 WS-ENTEG-MERKEZ-ADET            PIC 9(04).
+    03 WS-ENTEG-MERKEZ-DETAY OCCURS 1 TO 3000 TIMES DEPENDING ON
+                                       WS-ENTEG-MERKEZ-ADET.
+       05 WS-ENTEG-BOLGE-KODU          PIC 9(03).
+       05 WS-ENTEG-MERKEZ-NO           PIC 9(05).
+
+ EXEC SQL INCLUDE STRUCTURES ALL VERSION 315   END-EXEC.
+ EXEC SQL INCLUDE SQLCA                        END-EXEC.
+ EXEC SQL BEGIN DECLARE SECTION END-EXEC.
+ EXEC SQL INVOKE =HESPLANI NULL STRUCTURE AS D-HESPLAN END-EXEC.
+ EXEC SQL INVOKE =FISBASLIK NULL STRUCTURE AS D-FBASLIK END-EXEC.
+ EXEC SQL INVOKE =FISDETAY NULL STRUCTURE AS D-FDETAY  END-EXEC.
+ EXEC SQL INVOKE =PARAMETR NULL STRUCTURE AS D-PARAM   END-EXEC.
+*EXEC SQL INVOKE =DONKAPA  NULL STRUCTURE AS D-DONKAPA END-EXEC.
+ EXEC SQL INVOKE =OZETHES  NULL STRUCTURE AS D-OZETHES END-EXEC.
+ EXEC SQL INVOKE =ISLEMID  NULL STRUCTURE AS D-ISLEMID END-EXEC.
+* EXEC SQL INVOKE =USER     NULL STRUCTURE AS D-USER    END-EXEC.
+ EXEC SQL INVOKE =ODEMEKOD NULL STRUCTURE AS D-ODEKOD   END-EXEC.
+ EXEC SQL INVOKE =OZETLSTY  NULL STRUCTURE AS D-OZET     END-EXEC.
+ EXEC SQL INVOKE $DATA18.MUHTAB.ENTEGRS  NULL STRUCTURE AS D-ENTEG    END-EXEC.
+ EXEC SQL INVOKE $data18.muhtab.islemtur NULL STRUCTURE AS D-ISLEMTUR END-EXEC.
+ EXEC SQL INVOKE =PTTMRK                 NULL STRUCTURE AS D-PTTMRK   END-EXEC.
+ EXEC SQL INVOKE $DATA18.MUHTAB.ENTSONUC NULL STRUCTURE AS D-ENTSONUC END-EXEC.
+ EXEC SQL INVOKE =KURUMMRK               NULL STRUCTURE AS D-KURUMMRK END-EXEC.
+ EXEC SQL INVOKE =YRDKART  NULL STRUCTURE AS D-YRDKART  END-EXEC.
+ EXEC SQL INVOKE $DATA01.entegrs.enttab  NULL STRUCTURE AS D-ENTTAB   END-EXEC.
+
+ 01 S-VARIAB-INIT.
+    03 S-HESAP-REF-NO      PIC X(12).
+    03 S-HESAP-REF-COUNTER PIC 9(04).
+    03 S-KONSINYE-KURUM-ADET PIC 9(03).
+    03 S-TOPLAM-TUTAR      PIC S9(16)V99.
+    03 S-BORC-TUTAR        PIC S9(16)V99.
+    03 S-ALACAK-TUTAR      PIC S9(16)V99.
+    03 S-ISLEM-TARIHI.
+       05 S-ISLEM-YY       PIC 9(04).
+       05 S-ISLEM-MM       PIC 9(02).
+       05 S-ISLEM-DD       PIC 9(02).
+    03 S-BOLGE-KODU        PIC 9(03).
+    03 S-MERKEZ-NO         PIC 9(05).
+    03 S-ATM-TAHSIL-HESAP  PIC X(12).
+    03 S-ATM-TEDIYE-HESAP  PIC X(12).
+    03 S-ATM-AKTAR-HESAP   PIC X(12).
+    03 S-BSMV-HESAP-740    PIC X(12).
+    03 S-BSMV-HESAP-360    PIC X(12).
+    03 S-ONCEKI-MERKEZ-NO  PIC 9(05).
+    03 S-ONCEKI-SUBE-NO    PIC 9(03).
+    03 S-ONCEKI-GISE-NO    PIC 9(04).
+    03 S-ONCEKI-ENTEG-BOLGE-KODU PIC 9(03).
+    03 S-ONCEKI-ENTEG-MERKEZ-NO  PIC 9(05).
+    03 S-SIRA-NO           PIC 9(07).
+    03 S-ENT-TUTAR         PIC S9(16)V99.
+    03 S-ENT-TUTAR1        PIC S9(16)V99.
+    03 S-ENT-TUTAR2        PIC S9(16)V99.
+    03 S-ENT-TUTAR3        PIC S9(16)V99.
+    03 S-ENT-TUTAR4        PIC S9(16)V99.
+    03 S-ENT-TUTAR5        PIC S9(16)V99.
+    03 S-ENT-TUTAR6        PIC S9(16)V99.
+    03 S-ENT-TUTAR7        PIC S9(16)V99.
+    03 S-ENT-TUTAR8        PIC S9(16)V99.
+    03 S-ENT-TUTAR9        PIC S9(16)V99.
+    03 S-ENT-TUTAR10       PIC S9(16)V99.
+    03 S-ENT-TUTAR11       PIC S9(16)V99.
+    03 S-ENT-TUTAR12       PIC S9(16)V99.
+    03 S-ENT-KOMISYON      PIC S9(16)V99.
+    03 S-ENT-DOVIZ-MIKTARI PIC S9(16)V99.
+    03 S-EMANET-TUTAR-nkolay      PIC S9(16)V99.
+    03 S-EMANET-TUTAR-elekse      PIC S9(16)V99.
+    03 S-ACENTE-SICIL-NO        PIC X(11).
+    03 S-ONCEKI-ACENTE-SICIL-NO PIC X(11).
+    03 S-ONCEKII-SUBE-NO        PIC 9(03).
+    03 S-ONCEKII-MERKEZ-NO      PIC 9(05).
+    03 BCOUNT                   PIC 9(3).
+    03 DEF-FIS-ACIKLAMA         PIC X(255).
+    03 V-FIS-ACIKLAMA.
+       05 LEN                   PIC S9(04) COMP.
+       05 VAL                   PIC X(255).
+    03 V-IND-FIS-ACIKLAMA       PIC S9(04) COMP.
+    03 V-FIS-IPTAL-ACIKLAMA.
+       05 LEN                   PIC S9(04) COMP.
+       05 VAL                   PIC X(255).
+    03 V-IND-FIS-IPTAL-ACIKLAMA PIC S9(04) COMP.
+    03 DEF-DEK-ACIKLAMA         PIC X(100).
+    03 V-DEK-ACIKLAMA.
+       05 LEN                   PIC S9(04) COMP.
+       05 VAL                   PIC X(100).
+    03 V-IND-DEK-ACIKLAMA       PIC S9(04) COMP.
+    03 DEF-ACIKLAMA             PIC X(100).
+    03 V-ACIKLAMA.
+       05 LEN                   PIC S9(04) COMP.
+       05 VAL                   PIC X(100).
+    03 V-IND-ACIKLAMA           PIC S9(04) COMP.
+    03 DEF-ADRES                PIC X(100).
+    03 V-ADRES.
+       05 LEN                   PIC S9(04) COMP.
+       05 VAL                   PIC X(100).
+    03 V-IND-ADRES              PIC S9(04) COMP.
+    03 DEF-UNVAN                PIC X(30).
+    03 V-UNVAN.
+       05 LEN                   PIC S9(04) COMP.
+       05 VAL                   PIC X(30).
+    03 V-IND-UNVAN              PIC S9(04) COMP.
+    03 DEF-WEB-ADRESI          PIC X(50).
+    03 V-WEB-ADRESI.
+       05 LEN                  PIC S9(04) COMP.
+       05 VAL                  PIC X(50).
+    03 V-IND-WEB-ADRESI        PIC S9(04) COMP.
+
+    03 DEF-MAIL-ADRESI         PIC X(50).
+    03 V-MAIL-ADRESI.
+       05 LEN                  PIC S9(04) COMP.
+       05 VAL                  PIC X(50).
+    03 V-IND-MAIL-ADRESI       PIC S9(04) COMP.
+
+
+    03 DEF-DOGUS-SEBEBI        PIC X(100).
+    03 V-DOGUS-SEBEBI.
+       05 LEN                  PIC S9(04) COMP.
+       05 VAL                  PIC X(100).
+    03 V-IND-DOGUS-SEBEBI      PIC S9(04) COMP.
+
+    03 DEF-TAKIP-SAFHASI       PIC X(100).
+    03 V-TAKIP-SAFHASI.
+      05 LEN                  PIC S9(04) COMP.
+      05 VAL                  PIC X(100).
+    03 V-IND-TAKIP-SAFHASI     PIC S9(04) COMP.
+
+    03 DEF-IRTIBAT-ACKL        PIC X(100).
+    03 V-IRTIBAT-ACKL.
+      05 LEN                  PIC S9(04) COMP.
+      05 VAL                  PIC X(100).
+    03 V-IND-IRTIBAT-ACKL      PIC S9(04) COMP.
+
+    03 DEF-REVIZE               PIC X(50).
+    03 V-REVIZE.
+       05 LEN                  PIC S9(04) COMP.
+       05 VAL                  PIC X(50).
+    03 V-IND-REVIZE             PIC S9(04) COMP.
+
+* ihale-is, banka-cek ng
+    03 DEF-IHALE-ADI         PIC X(100).
+    03 V-IHALE-ADI.
+      05 LEN                 PIC S9(04) COMP.
+      05 VAL                 PIC X(100).
+    03 V-IND-IHALE-ADI       PIC S9(04) COMP.
+
+    03 DEF-IS-ADI            PIC X(100).
+    03 V-IS-ADI.
+      05 LEN                 PIC S9(04) COMP.
+      05 VAL                 PIC X(100).
+    03 V-IND-IS-ADI          PIC S9(04) COMP.
+
+    03 DEF-BANKA-ADI         PIC X(50).
+    03 V-BANKA-ADI.
+       05 LEN                PIC S9(04) COMP.
+       05 VAL                PIC X(50).
+    03 V-IND-BANKA-ADI       PIC S9(04) COMP.
+
+    03 DEF-CEK-NO            PIC X(10).
+    03 V-CEK-NO.
+       05 LEN                PIC S9(04) COMP.
+       05 VAL                PIC X(10).
+    03 V-IND-CEK-NO              PIC S9(04) COMP.
+
+    03 DEF-CEK-KONU          PIC X(20).
+    03 V-CEK-KONU.
+       05 LEN                PIC S9(04) COMP.
+       05 VAL                PIC X(20).
+    03 V-IND-CEK-KONU        PIC S9(04) COMP.
+* ng
+ EXEC SQL END DECLARE SECTION END-EXEC.
+
+    EXEC SQL
+      DECLARE SELECT_MFYS  CURSOR FOR
+      SELECT ENT_MERKEZ_NO,CASE  WHEN  ENT_SUBE_NO =  99 THEN              99
+                                 WHEN  ENT_SUBE_NO =   2 THEN              99
+                                 WHEN  ENT_SUBE_NO  BETWEEN 51 AND 98 THEN 99
+                                 ELSE                                       0
+                           END,
+                 1,CASE WHEN ENT_SUBE_NO =  99 THEN
+                     TRIM (LEADING "0" FROM CAST(ENT_SICIL_NO AS CHAR(11)))
+                          WHEN ENT_SUBE_NO =   2 THEN
+                     TRIM (LEADING "0" FROM CAST(ENT_SICIL_NO AS CHAR(11)))
+   WHEN  ENT_SUBE_NO = 53 and ent_merkez_no = 50928 and ent_islem_turu = "3951"
+    then
+            TRIM (LEADING "0" FROM CAST(ENT_SICIL_NO AS CHAR(11)))
+                          when ent_merkez_no between 40001 and 41000  then
+
+  TRIM (LEADING "0" FROM CAST((ENT_MERKEZ_NO * 100 + ENT_SUBE_NO) AS
+                                                                   CHAR(11)))
+                     ELSE                             " "
+                     END,
+             ENT_ISLEM_TURU,ENT_PARA_TURU,ENT_PARA_KURU,ent_nakit_mahsup,
+   CASE
+    WHEN ENT_ISLEM_TURU LIKE "4%"   THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR)*(-1 )
+    WHEN ENT_ISLEM_TURU LIKE "51%"  THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR)*(-1)
+    WHEN ENT_ISLEM_TURU LIKE "61%"  THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR)*(-1)
+    WHEN ENT_ISLEM_TURU LIKE "861%" THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR)*(-1)
+    WHEN ENT_ISLEM_TURU LIKE "12%"  THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR)*(-1)
+    WHEN ENT_ISLEM_TURU LIKE "22%"  THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR)*(-1)
+    WHEN ENT_ISLEM_TURU LIKE "71%"  THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR)*(-1)
+    WHEN ENT_ISLEM_TURU IN( "3383", "3384","3385","8668","7551","7487","7494",
+     "7343","7372","7346","7406", "7426","7338","7342","7461","7472",
+     "7339","7345","7369","7417","7344","7433","7340","7341","7534","7582",
+     "7595","7462","7463","7522","8615",  "8616","7616","7627","7628","7629",
+ "7608","7630","7634","7635","7641","7644","7654","7658","7659","7660","7694",
+ "7693","7689","7707","7717","7718","7722","7727","7738","7739","7740")
+
+
+    THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR)*(-1)
+    WHEN ENT_ISLEM_TURU LIKE "63%"  THEN SUM(ENT_TUTAR)
+   ELSE                                  SUM((ENT_CARPAN - 1) * ENT_TUTAR)
+   END,
+      CASE
+     WHEN  ENT_ISLEM_TURU IN ("1200","1210","2200","5100","6100","7100","7101",
+                              "1211")
+                       THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR1)*(-1)
+           ELSE SUM((ENT_CARPAN - 1) * ENT_TUTAR1)
+       END,
+       CASE
+           WHEN ENT_ISLEM_TURU IN ("5100","7100","7101","2200")
+                       THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR2)*(-1)
+           ELSE SUM((ENT_CARPAN - 1) * ENT_TUTAR2)
+       END,
+       CASE
+       when ent_islem_turu in ("5100","2200","7100","7101")
+           THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR3)*(-1)
+           ELSE SUM((ENT_CARPAN - 1) * ENT_TUTAR3)
+       END,
+       CASE ENT_ISLEM_TURU
+           WHEN "2200" THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR4)*(-1)
+           WHEN "6100" THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR4)*(-1)
+           ELSE SUM((ENT_CARPAN - 1) * ENT_TUTAR4)
+       END,
+       CASE ENT_ISLEM_TURU
+           WHEN "2200" THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR5)*(-1)
+           ELSE SUM((ENT_CARPAN - 1) * ENT_TUTAR5)
+       END,
+       CASE ENT_ISLEM_TURU
+           WHEN "2200" THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR6)*(-1)
+           ELSE SUM((ENT_CARPAN - 1) * ENT_TUTAR6)
+       END,
+       CASE ENT_ISLEM_TURU
+           WHEN "2200" THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR7)*(-1)
+           ELSE SUM((ENT_CARPAN - 1) * ENT_TUTAR7)
+       END,
+       CASE ENT_ISLEM_TURU
+           WHEN "2200" THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR8)*(-1)
+           ELSE SUM((ENT_CARPAN - 1) * ENT_TUTAR8)
+       END,
+       CASE ENT_ISLEM_TURU
+           WHEN "2200" THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR9)*(-1)
+           ELSE SUM((ENT_CARPAN - 1) * ENT_TUTAR9)
+       END,
+       CASE ENT_ISLEM_TURU
+           WHEN "2200" THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR10)*(-1)
+           WHEN "7200" THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR10)*(-1)
+           ELSE SUM((ENT_CARPAN - 1) * ENT_TUTAR10)
+       END,
+       CASE ENT_ISLEM_TURU
+           WHEN "2200" THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR11)*(-1)
+           ELSE SUM((ENT_CARPAN - 1) * ENT_TUTAR11)
+       END,
+       CASE ENT_ISLEM_TURU
+           WHEN "2200" THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR12)*(-1)
+           ELSE SUM((ENT_CARPAN - 1) * ENT_TUTAR12)
+       END,
+  CASE
+     WHEN ENT_ISLEM_TURU LIKE "4%"   THEN SUM (ENT_ADET*(ENT_CARPAN - 1 )*(-1))
+     WHEN ENT_ISLEM_TURU LIKE "51%"  THEN SUM (ENT_ADET*(ENT_CARPAN - 1 )*(-1))
+     WHEN ENT_ISLEM_TURU LIKE "61%"  THEN SUM (ENT_ADET*(ENT_CARPAN - 1 )*(-1))
+     WHEN ENT_ISLEM_TURU LIKE "861%" THEN SUM (ENT_ADET*(ENT_CARPAN - 1 )*(-1))
+     WHEN ENT_ISLEM_TURU LIKE "12%"  THEN SUM (ENT_ADET*(ENT_CARPAN - 1 )*(-1))
+     WHEN ENT_ISLEM_TURU LIKE "22%"  THEN SUM (ENT_ADET*(ENT_CARPAN - 1 )*(-1))
+     WHEN ENT_ISLEM_TURU LIKE "71%"  THEN SUM (ENT_ADET*(ENT_CARPAN - 1 )*(-1))
+    WHEN ENT_ISLEM_TURU IN( "3383", "3384","3385","8668","7551","7487","7494",
+        "7343","7372","7346","7406", "7426","7338","7342","7461","7472",
+     "7339","7345","7369","7417","7344","7433","7340","7341","7534","7582",
+     "7595","7462","7463","7522","8615",  "8616","7616","7627","7628","7629",
+  "7608","7630","7634","7635","7641","7644","7654","7658","7659","7660","7694",
+  "7693","7689","7707","7717","7718","7722","7727","7738","7739","7740")
+
+ THEN SUM (ENT_ADET*(ENT_CARPAN - 1 )*(-1))
+
+
+     WHEN ENT_ISLEM_TURU LIKE "63%"  THEN SUM (ENT_ADET)
+  ELSE                                    SUM (ENT_ADET*(ENT_CARPAN - 1 ))
+  END
+      FROM $DATA01.entegrs.enttab
+      WHERE ENT_YIL        = :S-ISLEM-YY  AND
+            ENT_AY         = :S-ISLEM-MM  AND
+            ENT_GUN        = :S-ISLEM-DD  AND
+            ENT_MERKEZ_NO  = :S-MERKEZ-NO AND
+  (CASE
+    WHEN ENT_ISLEM_TURU LIKE "4%"   THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR)*(-1)
+    WHEN ENT_ISLEM_TURU LIKE "51%"  THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR)*(-1)
+    WHEN ENT_ISLEM_TURU LIKE "61%"  THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR)*(-1)
+    WHEN ENT_ISLEM_TURU LIKE "861%" THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR)*(-1)
+    WHEN ENT_ISLEM_TURU LIKE "12%"  THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR)*(-1)
+    WHEN ENT_ISLEM_TURU LIKE "22%"  THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR)*(-1)
+    WHEN ENT_ISLEM_TURU LIKE "71%"  THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR)*(-1)
+    WHEN ENT_ISLEM_TURU IN( "3383", "3384","3385","8668","7551","7487","7494",
+        "7343","7372","7346","7406", "7426","7338","7342","7461","7472",
+     "7339","7345","7369","7417","7344","7433","7340","7341","7534","7582",
+     "7595","7462","7463","7522","8615",  "8616","7616","7627","7628","7629",
+ "7608","7630","7634","7635","7641","7644","7654","7658","7659","7660","7694",
+ "7693","7689","7707","7717","7718","7722","7727","7738","7739","7740")
+
+
+ THEN SUM((ENT_CARPAN - 1) * ENT_TUTAR)*(-1)
+    WHEN ENT_ISLEM_TURU LIKE "63%"  THEN SUM(ENT_TUTAR)
+   ELSE                                  SUM((ENT_CARPAN - 1) * ENT_TUTAR)
+   END > 0 OR ENT_ISLEM_TURU = "7200" OR ENT_ISLEM_TURU = "2100"
+           OR ENT_ISLEM_TURU = "3951"
+           or ent_islem_turu = "7657"
+           or ent_islem_turu = "7671"
+           or ent_islem_turu = "7621"
+           or ent_islem_turu = "7702" or ent_islem_turu = "7728")
+*  and (ent_sube_no in (99,2) or ent_merkez_no between 40000 and 41000)
+       and (ent_sube_no in (99,2) or
+      (ent_merkez_no = 50928 and  ent_sube_no = 53 and ent_islem_turu ="3951"))
+        and ent_islem_turu not in ("3805","3803","6300","2800" ,"3381","3382","3952")
+
+        and ent_para_turu  in ("TL" , "YTL")
+                and ent_nakit_mahsup in ("N","K")
+     GROUP BY 1,2,3,4,5,6,7,8
+*65000 e takildigi i‡in kapatildi. atekler pttmrkda kapali idi
+*     browse access
+*     UNION ALL
+*
+*  SELECT IOMERKEZ_NO,CASE  WHEN  IOSUBE_NO =  99 THEN              99
+*                                 WHEN  IOSUBE_NO =   2 THEN              99
+*                                 WHEN  IOSUBE_NO  BETWEEN 51 AND 98 THEN 99
+*                                 ELSE                                       0
+*                           END,        1,
+*
+*  TRIM (LEADING "0" FROM CAST((IOMERKEZ_NO * 100 + IOSUBE_NO) AS  CHAR(11))) ,
+*            IOISLEM_TURU, PARA_TURU, PARA_KURU, "N",
+*      SUM((IOCARPAN - 1) * IOTUTAR)
+*      ,
+*      SUM((IOCARPAN - 1) * IOTUTAR1)
+*      ,
+*      SUM((IOCARPAN - 1) * IOTUTAR2)
+*      ,
+*      SUM((IOCARPAN - 1) * IOTUTAR3)
+*      ,
+*      SUM((IOCARPAN - 1) * IOTUTAR4)
+*      ,
+*      SUM((IOCARPAN - 1) * IOTUTAR5)
+*       ,
+*      SUM((IOCARPAN - 1) * IOTUTAR6)
+*      ,
+*      SUM((IOCARPAN - 1) * IOTUTAR7)
+*       ,
+*      SUM((IOCARPAN - 1) * IOTUTAR8)
+*      ,
+*      SUM((IOCARPAN - 1) * IOTUTAR9)
+*       ,
+*      SUM((IOCARPAN - 1) * IOTUTAR10)
+*      ,
+*      SUM((IOCARPAN - 1) * IOTUTAR11)
+*      ,
+*      SUM((IOCARPAN - 1) * IOTUTAR12)
+*      ,
+*      SUM (IOADET*(IOCARPAN - 1 ))
+*
+*      FROM =ozetlsty
+*      WHERE IOYIL        = :S-ISLEM-YY AND
+*            IOAY         = :S-ISLEM-MM AND
+*            IOGUN        = :S-ISLEM-DD AND
+*            IOMERKEZ_NO  = :S-MERKEZ-NO AND
+*                 SUM((IOCARPAN - 1) * IOTUTAR) > 0
+*        and iomerkez_no between 40000 and 41000
+*        and ioislem_turu  in ("3951","3667")
+*        and  para_turu  in ("TL" , "YTL")
+*     GROUP BY 1,2,3,4,5,6,7,8
+     order by 1,2,3,4,5,6,7,8
+     browse access
+ END-EXEC.
+
+    EXEC SQL
+      DECLARE SELECT_REF_NO CURSOR FOR
+      SELECT GMU_HESAP_REF_NO,GMU_BAKIYE_DURUMU
+      FROM =HESPLANI
+      WHERE GMU_KURULUS_KODU = :GMU-KURULUS-KODU OF D-HESPLAN AND
+            GMU_DETAY_DURUMU = "A"                            AND
+                  GMU_HESAP1 = :GMU-HESAP1       OF D-HESPLAN AND
+                  GMU_HESAP2 = :GMU-HESAP2       OF D-HESPLAN AND
+                  GMU_HESAP3 = :GMU-HESAP3       OF D-HESPLAN
+      BROWSE ACCESS
+    END-EXEC.
+
+*   EXEC SQL
+*     DECLARE SELECT_USER CURSOR FOR
+*     SELECT SUBE_NO,GISE_NO
+*      FROM  =USER
+*      WHERE KURULUS_KODU = :KURULUS-KODU OF D-USER AND
+*              BOLGE_KODU = :BOLGE-KODU   OF D-USER AND
+*               MERKEZ_NO = :MERKEZ-NO    OF D-USER
+*      ORDER BY 1,2
+*     BROWSE ACCESS
+*   END-EXEC.
+
+    EXEC SQL
+      DECLARE SELECT_MERKEZ_NO CURSOR FOR
+                 SELECT BOLGE_KODU,MERKEZ_NO
+          from =pttmrk
+    where
+*       merkez_no not IN (8813,50928)
+         (MERKEZ_NO < 50000 or merkez_no = 50928)
+        AND (BOLGE_KODU  not in (200,134) or merkez_no = 8813
+        or merkez_no = 50928)
+    and
+      BOLGE_KODU NOT IN (135,206,234,334,134)
+
+        AND DURUM <> "KAPALI"
+       GROUP BY 1,2
+       ORDER BY 1,2
+      BROWSE ACCESS
+    END-EXEC.
+*
+ PROCEDURE DIVISION.
+*
+ H00-MAIN SECTION.
+
+    INITIALIZE OK-MSG, S-VARIAB-INIT, D-HESPLAN, D-FBASLIK, WS-VARIAB-INIT,
+               D-PARAM, D-FDETAY, WS-SUBPROG-VARIAB, WS-PARAMETER-HATA,
+               WS-PARAMETER-FLAG, d-enttab,
+               D-OZETHES, D-ISLEMID,         D-OZET,
+               D-ENTEG, D-ISLEMTUR, D-ODEKOD, D-PTTMRK, D-ENTSONUC, D-KURUMMRK,
+               WS-ENTEG-MERKEZ-ADET, D-YRDKART, S-ACENTE-SICIL-NO
+    REPLACING ALPHANUMERIC BY SPACES NUMERIC BY ZEROES.
+
+    EXEC SQL BEGIN WORK END-EXEC.
+
+    PERFORM SELECT-PARAMETRE-HESAP.
+    IF OK-MSG = 0 AND OK-MESSAGE = 0
+       PERFORM SELECT-MERKEZ-NO
+    END-IF.
+    IF NOT WS-TRANSACTION-BITIR-FLAG
+       EXEC SQL COMMIT WORK END-EXEC
+    END-IF.
+
+    IF OK-MSG = 0 AND OK-MESSAGE = 0
+       PERFORM ENTEGRASYON-YAP
+    END-IF.
+
+    IF OK-MSG = 0
+       MOVE "0000" TO WS-RESPONSE-CODE
+       MOVE "00"   TO WS-RESPONSE-COUNTER
+    END-IF.
+
+***ENTER TAL "ENDTRANSACTION".
+
+ H00-MAIN-EXIT.
+   STOP RUN.
+
+********************************************************************************
+ SELECT-PARAMETRE-HESAP SECTION.
+
+  MOVE "=PARAMETR"     TO WS-HATA-TABLE-NAME
+  MOVE WS-KURULUS-KODU TO GMU-KURULUS-KODU  OF D-PARAM
+  MOVE "G00"           TO GMU-PARAMETRE-KEY OF D-PARAM
+
+
+   EXEC SQL
+     SELECT GMU_NAKIT_KASA_REF,GMU_DOVIZ_KASA_REF
+     INTO :GMU-NAKIT-KASA-REF OF D-PARAM,
+          :GMU-DOVIZ-KASA-REF OF D-PARAM
+         FROM =PARAMETR
+     WHERE GMU_KURULUS_KODU = :GMU-KURULUS-KODU OF D-PARAM AND
+          GMU_PARAMETRE_KEY = :GMU-PARAMETRE-KEY OF D-PARAM
+     BROWSE ACCESS
+   END-EXEC.
+   EVALUATE SQLCODE OF SQLCA
+   WHEN 0
+     CONTINUE
+   WHEN 100
+     PERFORM HATA-VER-WORK-100
+     GO TO SELECT-PARAMETRE-HESAP-EXIT
+   WHEN OTHER
+     PERFORM HATA-VER-WORK-OTHER
+     GO TO SELECT-PARAMETRE-HESAP-EXIT
+   END-EVALUATE.
+
+*simdi de atm icin gerekli hesaplar select ediliyor.
+
+  MOVE "G02"           TO GMU-PARAMETRE-KEY OF D-PARAM
+
+   EXEC SQL
+     SELECT GMU_DOVIZ_DEGERLEME_HESAP_REF,
+            GMU_BM_290_HESAP_REF,
+            GMU_DOVIZ_KAR_HESAP_REF
+     INTO :S-ATM-TEDIYE-HESAP,
+          :S-ATM-TAHSIL-HESAP,
+          :S-ATM-AKTAR-HESAP
+         FROM =PARAMETR
+     WHERE GMU_KURULUS_KODU = :GMU-KURULUS-KODU OF D-PARAM AND
+          GMU_PARAMETRE_KEY = :GMU-PARAMETRE-KEY OF D-PARAM
+     BROWSE ACCESS
+   END-EXEC.
+   EVALUATE SQLCODE OF SQLCA
+   WHEN 0
+     CONTINUE
+   WHEN 100
+     PERFORM HATA-VER-WORK-100
+     GO TO SELECT-PARAMETRE-HESAP-EXIT
+   WHEN OTHER
+     PERFORM HATA-VER-WORK-OTHER
+     GO TO SELECT-PARAMETRE-HESAP-EXIT
+   END-EVALUATE.
+
+*simdi de bsmv için gerekli hesaplar select ediliyor.
+
+    MOVE "G05"           TO GMU-PARAMETRE-KEY OF D-PARAM
+
+ EXEC SQL
+     SELECT GMU_MDV_ARTIS_HESABI_REF,GMU_NAKIT_KASA_REF
+     INTO :S-BSMV-HESAP-740,
+          :S-BSMV-HESAP-360
+     FROM =PARAMETR
+     WHERE GMU_KURULUS_KODU = :GMU-KURULUS-KODU  OF D-PARAM AND
+          GMU_PARAMETRE_KEY = :GMU-PARAMETRE-KEY OF D-PARAM
+     BROWSE ACCESS
+   END-EXEC.
+   EVALUATE SQLCODE OF SQLCA
+   WHEN 0
+     CONTINUE
+   WHEN 100
+     PERFORM HATA-VER-WORK-100
+     GO TO SELECT-PARAMETRE-HESAP-EXIT
+   WHEN OTHER
+     PERFORM HATA-VER-WORK-OTHER
+     GO TO SELECT-PARAMETRE-HESAP-EXIT
+   END-EVALUATE.
+
+ SELECT-PARAMETRE-HESAP-EXIT.
+     EXIT.
+******************************************************************************
+ SELECT-MERKEZ-NO SECTION.
+
+  MOVE "=KURUMMRK"         TO WS-HATA-TABLE-NAME
+  MOVE "SELECT_MERKEZ_NO"  TO WS-HATA-CURSOR-NAME
+
+    EXEC SQL OPEN SELECT_MERKEZ_NO END-EXEC.
+    IF SQLCODE OF SQLCA NOT EQUAL 0
+       MOVE "5990"           TO WS-RESPONSE-CODE
+       MOVE "COULD-NOT-OPEN" TO WS-HATA-MESAJI-TIPI
+       MOVE "05"             TO WS-RESPONSE-COUNTER
+       PERFORM HATA-VER-WORK
+       GO TO ENTEGRASYON-YAP-EXIT
+    END-IF
+
+   PERFORM WITH TEST BEFORE VARYING K-SAY FROM 1 BY 1 UNTIL  DON-MSG = 1 OR
+                                                             OK-MSG  = 1
+   EXEC SQL
+     FETCH SELECT_MERKEZ_NO INTO
+        :BOLGE-KODU  OF D-PTTMRK,
+        :MERKEZ-NO   OF D-KURUMMRK
+   END-EXEC
+   EVALUATE SQLCODE OF SQLCA
+   WHEN 0
+     MOVE MERKEZ-NO  OF D-KURUMMRK TO WS-ENTEG-MERKEZ-NO(K-SAY)
+     MOVE BOLGE-KODU OF D-PTTMRK   TO WS-ENTEG-BOLGE-KODU(K-SAY)
+      ADD 1 TO WS-ADET-MERKEZ
+      ADD 1 TO WS-ENTEG-MERKEZ-ADET
+   WHEN 100
+     MOVE 1 TO DON-MSG
+     IF WS-ADET-MERKEZ = 0
+       PERFORM HATA-VER-WORK-100
+       MOVE 1 TO OK-MESSAGE
+     END-IF
+   WHEN OTHER
+     MOVE 1 TO DON-MSG
+     PERFORM HATA-VER-WORK-OTHER
+     MOVE 1 TO OK-MESSAGE
+   END-EVALUATE
+  END-PERFORM.
+
+  EXEC SQL CLOSE SELECT_MERKEZ_NO END-EXEC.
+
+ SELECT-MERKEZ-NO-EXIT.
+      EXIT.
+*****************************************************************************
+ ENTEGRASYON-YAP SECTION.
+
+  MOVE WS-ENTEG-MERKEZ-ADET TO WS-MERKEZ-ADET
+  PERFORM WITH TEST BEFORE VARYING K-SAY FROM 1 BY 1 UNTIL K-SAY >
+                                                           WS-MERKEZ-ADET
+  MOVE "=OZETLSTY"                TO WS-HATA-TABLE-NAME
+  MOVE "SELECT_MFYS"              TO WS-HATA-CURSOR-NAME
+  MOVE WS-ENTEG-MERKEZ-NO(K-SAY)  TO S-MERKEZ-NO
+  MOVE WS-ENTEG-BOLGE-KODU(K-SAY) TO S-BOLGE-KODU
+
+  MOVE FUNCTION CURRENT-DATE(1:8) TO WS-GUNUN-TARIHI
+  MOVE FUNCTION INTEGER-OF-DATE (WS-GUNUN-TARIHI) TO WS-ISLEM-TARIHI-INTEGER
+  COMPUTE WS-ISLEM-TARIHI-INTEGER = WS-ISLEM-TARIHI-INTEGER - 1
+  MOVE FUNCTION DATE-OF-INTEGER (WS-ISLEM-TARIHI-INTEGER) TO WS-ISLEM-TARIHI
+  MOVE WS-ISLEM-YIL TO S-ISLEM-YY
+  MOVE WS-ISLEM-AY  TO S-ISLEM-MM
+  MOVE WS-ISLEM-GUN TO S-ISLEM-DD
+  move ws-islem-tarihi to s-islem-tarihi
+
+* MOVE 2018         TO S-ISLEM-YY
+* MOVE 07           TO S-ISLEM-MM
+* MOVE 30           TO S-ISLEM-DD
+
+* move 20180730        to ws-islem-tarihi, s-islem-tarihi
+
+**-----------------------
+* DISPLAY "HANGI GUN ICIN ENTEGRASYON YAPIYORSUNUZ?"
+* WITH NO ADVANCING
+* ACCEPT s-islem-tarihi
+* move s-islem-tarihi to ws-islem-tarihi
+**-----------------------
+
+
+  INITIALIZE WS-FLAG10, WS-FLAG11, WS-FLAG12, DON-MSG, WS-ADET, OK-MSG,
+             OK-MSG-ENT, WS-FLAG9, WS-FLAG13, WS-FLAG14, WS-FLAG15, WS-FLAG6,
+             S-ONCEKII-SUBE-NO, S-ONCEKI-ACENTE-SICIL-NO, WS-KAYITVAR-FLAG,
+              S-ONCEKII-MERKEZ-NO
+
+
+   EXEC SQL BEGIN WORK END-EXEC
+
+    EXEC SQL OPEN SELECT_MFYS END-EXEC
+    IF SQLCODE OF SQLCA NOT EQUAL 0
+       MOVE "5990"           TO WS-RESPONSE-CODE
+       MOVE "COULD-NOT-OPEN" TO WS-HATA-MESAJI-TIPI
+       MOVE "05"             TO WS-RESPONSE-COUNTER
+       PERFORM HATA-VER-WORK
+       GO TO ENTEGRASYON-YAP-EXIT
+    ELSE
+       SET WS-CURSOR-ACIK-FLAG TO TRUE
+    END-IF
+
+   PERFORM WITH TEST BEFORE VARYING J-SAY FROM 1 BY 1 UNTIL  DON-MSG = 1 OR
+                                                             OK-MSG  = 1
+   EXEC SQL
+     FETCH SELECT_MFYS INTO
+        :IOMERKEZ-NO   OF D-OZET,
+        :IOSUBE-NO     OF D-OZET,
+        :IOGISE-NO     OF D-OZET,
+        :S-ACENTE-SICIL-NO,
+        :IOISLEM-TURU  OF D-OZET,
+        :PARA-TURU     OF D-OZET,
+        :PARA-KURU     OF D-OZET,
+        :ent-nakit-mahsup of d-enttab,
+        :IOTUTAR       OF D-OZET,
+        :IOTUTAR1      OF D-OZET,
+        :IOTUTAR2      OF D-OZET,
+        :IOTUTAR3      OF D-OZET,
+        :IOTUTAR4      OF D-OZET,
+        :IOTUTAR5      OF D-OZET,
+        :IOTUTAR6      OF D-OZET,
+        :IOTUTAR7      OF D-OZET,
+        :IOTUTAR8      OF D-OZET,
+        :IOTUTAR9      OF D-OZET,
+        :IOTUTAR10     OF D-OZET,
+        :IOTUTAR11     OF D-OZET,
+        :IOTUTAR12     OF D-OZET,
+        :IOADET        OF D-OZET
+   END-EXEC
+   EVALUATE SQLCODE OF SQLCA
+   WHEN 0
+     INITIALIZE WS-FLAG13, WS-FLAG15, WS-FLAG6
+     INITIALIZE WS-ACENTE-ALACAKLARI-REF
+     IF IOMERKEZ-NO OF D-OZET < 40000
+     if s-acente-sicil-no > 30000000 and s-acente-sicil-no < 32000000
+        move  WS-ACENTE-ALACAKLARI-REF5 to  WS-ACENTE-ALACAKLARI-REF
+        else
+      if s-acente-sicil-no > 32000000 and s-acente-sicil-no < 33000000
+        move  WS-ACENTE-ALACAKLARI-REF9 to  WS-ACENTE-ALACAKLARI-REF
+        else
+        MOVE WS-ACENTE-ALACAKLARI-REF1 TO WS-ACENTE-ALACAKLARI-REF
+         end-if
+       end-if
+     ELSE
+        MOVE WS-ACENTE-ALACAKLARI-REF2 TO WS-ACENTE-ALACAKLARI-REF
+*       MOVE WS-ACENTE-FIS-ACIKLAMA2   TO WS-FIS-ACIKLAMA
+     END-IF
+
+
+
+        IF IOMERKEZ-NO = 8813
+                move 200   to s-bolge-kodu
+            MOVE 50003 TO IOMERKEZ-NO OF D-OZET
+            END-IF
+
+*           IF IOMERKEZ-NO = 50003
+*          AND  IOISLEM-TURU  OF D-OZET EQUAL "3951"
+*                 AND (S-ACENTE-SICIL-NO EQUAL 777776 or S-ACENTE-SICIL-NO EQUAL 999998)
+*          move 200   to s-bolge-kodu
+*          MOVE 50928 TO IOMERKEZ-NO OF D-OZET
+*        END-IF
+
+
+             IF S-ACENTE-SICIL-NO = 999997
+              MOVE WS-ACENTE-ALACAKLARI-REF3 TO WS-ACENTE-ALACAKLARI-REF
+            END-IF
+            IF S-ACENTE-SICIL-NO = 888889
+              MOVE WS-ACENTE-ALACAKLARI-REF4 TO WS-ACENTE-ALACAKLARI-REF
+            END-IF
+      if s-acente-sicil-no = 777777
+              MOVE WS-ACENTE-ALACAKLARI-REF7 TO WS-ACENTE-ALACAKLARI-REF
+             end-if
+      if s-acente-sicil-no = 777776
+              MOVE WS-ACENTE-ALACAKLARI-REF10 TO WS-ACENTE-ALACAKLARI-REF
+             end-if
+
+              if s-acente-sicil-no = 999996
+              MOVE WS-ACENTE-ALACAKLARI-REF8 TO WS-ACENTE-ALACAKLARI-REF
+             end-if
+
+
+           if s-acente-sicil-no = 999998 and IOISLEM-TURU  OF D-OZET = "3951"
+*              and IOMERKEZ-NO OF D-OZET = 50003
+              and IOMERKEZ-NO OF D-OZET = 50928
+              MOVE WS-ACENTE-ALACAKLARI-REF11 TO WS-ACENTE-ALACAKLARI-REF
+             end-if
+     MOVE 1 TO WS-KAYITVAR-FLAG
+     IF PARA-TURU OF D-OZET = "YTL"
+        MOVE "TL " TO PARA-TURU OF D-OZET
+     END-IF
+     IF IOSUBE-NO OF D-OZET = 99 OR IOSUBE-NO OF D-OZET = 2
+        ADD 1 TO WS-ILKMI
+     END-IF
+     IF WS-ILKMI = 1
+        MOVE S-ACENTE-SICIL-NO TO S-ONCEKI-ACENTE-SICIL-NO
+        MOVE IOSUBE-NO OF D-OZET TO S-ONCEKII-SUBE-NO
+        MOVE IOMERKEZ-NO OF D-OZET TO S-ONCEKII-MERKEZ-NO
+     ELSE
+        IF IOSUBE-NO OF D-OZET = 99  OR (IOMERKEZ-NO OF D-OZET >= 40000 AND
+           IOMERKEZ-NO OF D-OZET <= 41000 )
+           IF S-ONCEKII-SUBE-NO = 99 OR WS-ILKMI = 1 or
+            (S-ONCEKII-MERKEZ-NO >= 40000 AND S-ONCEKII-MERKEZ-NO <= 41000)
+              IF S-ACENTE-SICIL-NO NOT EQUAL S-ONCEKI-ACENTE-SICIL-NO
+                 SET WS-YENI-SUBE-FLAG TO TRUE
+          IF IOMERKEZ-NO = 50003 OR IOMERKEZ-NO = 50928
+
+             IF S-onceki-ACENTE-SICIL-NO = 999997
+              MOVE WS-ACENTE-ALACAKLARI-REF3 TO WS-ACENTE-ALACAKLARI-REF
+             END-IF
+             IF S-onceki-ACENTE-SICIL-NO = 888889
+              MOVE WS-ACENTE-ALACAKLARI-REF4 TO WS-ACENTE-ALACAKLARI-REF
+             END-IF
+            IF S-onceki-ACENTE-SICIL-NO = 777777
+             MOVE WS-ACENTE-ALACAKLARI-REF7 TO WS-ACENTE-ALACAKLARI-REF
+             END-IF
+            IF S-onceki-ACENTE-SICIL-NO = 777776
+             MOVE WS-ACENTE-ALACAKLARI-REF10 TO WS-ACENTE-ALACAKLARI-REF
+             END-IF
+
+             IF S-onceki-ACENTE-SICIL-NO = 999998 and IOISLEM-TURU  OF D-OZET = "3951"
+             MOVE WS-ACENTE-ALACAKLARI-REF11 TO WS-ACENTE-ALACAKLARI-REF
+             END-IF
+
+               IF S-onceki-ACENTE-SICIL-NO = 999996
+             MOVE WS-ACENTE-ALACAKLARI-REF8 TO WS-ACENTE-ALACAKLARI-REF
+             END-IF
+       end-if
+* if s-onceki-acente-sicil-no > 30000000 and s-onceki-acente-sicil-no < 39999999
+*       move  WS-ACENTE-ALACAKLARI-REF5 to  WS-ACENTE-ALACAKLARI-REF
+*   end-if
+                 PERFORM ACENTE-FIS-KAPA
+              END-IF
+           END-IF
+        END-IF
+     END-IF
+     INITIALIZE WS-FLAG13
+     PERFORM MFYS-ENTEGRASYON
+     MOVE S-ACENTE-SICIL-NO TO S-ONCEKI-ACENTE-SICIL-NO
+         IF IOMERKEZ-NO = 50003 OR IOMERKEZ-NO = 50928
+
+             IF S-onceki-ACENTE-SICIL-NO = 999997
+              MOVE WS-ACENTE-ALACAKLARI-REF3 TO WS-ACENTE-ALACAKLARI-REF
+            END-IF
+            IF S-onceki-ACENTE-SICIL-NO = 888889
+              MOVE WS-ACENTE-ALACAKLARI-REF4 TO WS-ACENTE-ALACAKLARI-REF
+            END-IF
+            IF S-onceki-ACENTE-SICIL-NO = 999996
+               MOVE WS-ACENTE-ALACAKLARI-REF8 TO WS-ACENTE-ALACAKLARI-REF
+            END-IF
+
+       end-if
+
+      MOVE IOSUBE-NO OF D-OZET TO S-ONCEKII-SUBE-NO
+      MOVE IOMERKEZ-NO OF D-OZET TO S-ONCEKII-MERKEZ-NO
+     IF OK-MSG-ENT = 0
+        ADD 1 TO WS-ADET
+        MOVE ENT-BOLGE-KODU OF D-ENTEG TO S-ONCEKI-ENTEG-BOLGE-KODU
+        MOVE ENT-MERKEZ-NO  OF D-ENTEG TO S-ONCEKI-ENTEG-MERKEZ-NO
+        INITIALIZE D-ENTEG
+     ELSE
+        EXIT PERFORM
+     END-IF
+   WHEN 100
+     MOVE 1 TO DON-MSG
+     EXEC SQL CLOSE SELECT_MFYS END-EXEC
+     IF S-ONCEKII-SUBE-NO = 99  or
+       (S-ONCEKII-MERKEZ-NO >= 40000 AND S-ONCEKII-MERKEZ-NO <= 41000)
+        SET WS-YENI-SUBE-FLAG TO TRUE
+        PERFORM ACENTE-FIS-KAPA
+     END-IF
+     IF WS-ADET = 0
+        MOVE "5990"        TO WS-RESPONSE-CODE
+        MOVE "NOT-FOUND"   TO WS-HATA-MESAJI-TIPI
+        MOVE "06"          TO WS-RESPONSE-COUNTER
+        PERFORM HATA-VER-WORK
+     END-IF
+   WHEN OTHER
+     EXEC SQL CLOSE SELECT_MFYS END-EXEC
+     MOVE 1 TO DON-MSG
+     MOVE "5990"        TO WS-RESPONSE-CODE
+     MOVE "OTHER"       TO WS-HATA-MESAJI-TIPI
+     SET WS-FATAL-ERROR TO TRUE
+     MOVE "07"          TO WS-RESPONSE-COUNTER
+     PERFORM HATA-VER-WORK
+   END-EVALUATE
+  END-PERFORM
+
+    IF NOT WS-TRANSACTION-BITIR-FLAG
+       EXEC SQL COMMIT WORK END-EXEC
+    END-IF
+
+*** MARK-MERKEZ-ENT-BITIR
+
+    PERFORM INSERT-SONUC-RAPOR
+
+    INITIALIZE OK-MSG, WS-ILKMI, WS-SUBPROG-VARIAB,
+               WS-PARAMETER-FLAG, S-ACENTE-SICIL-NO
+
+
+ END-PERFORM.
+
+ ENTEGRASYON-YAP-EXIT.
+      EXIT.
+*****************************************************************************
+ MFYS-ENTEGRASYON SECTION.
+
+*islemtur tablosundaki muh_hes_ref_no,muh_hes_ref_no1........
+*kolonlari postanet2004 tarafinda merkezlerin muhasebe dokumlerini
+*aldiklari =OZETLSTY ve mfys entegrasyon islemleri icin kullanilan
+*=mfys tablosundan yapilan select sonucundaki iotutar,iotutar1,iotutar2...
+*kolonlarindaki tutarlarin hangi muhasebe hesaplarina yansitilacagini
+*gosterir.
+
+   INITIALIZE D-ISLEMTUR, WS-FLAG7, WS-FLAG8, WS-FLAG12
+                                ,  s-emanet-tutar-nkolay , s-emanet-tutar-elekse
+   MOVE IOISLEM-TURU OF D-OZET TO ISLEM-TURU OF D-ISLEMTUR
+   MOVE PARA-TURU    OF D-OZET TO PARA-TURU  OF D-ISLEMTUR
+   PERFORM SELECT-ISLEMTUR
+   IF CARPAN OF D-ISLEMTUR NOT EQUAL 1
+      CONTINUE
+   ELSE
+      GO TO MFYS-ENTEGRASYON-EXIT
+   END-IF.
+
+   IF KOMISYON OF D-ISLEMTUR = 0
+      MOVE "5921"    TO WS-RESPONSE-CODE
+      STRING ISLEM-TURU OF D-ISLEMTUR " ÝÞLEM TÜRÜNE AÝT "
+      DELIMITED BY SIZE
+      "KOMÝSYON ORANÝNDA SORUN VAR, LÜTFEN KONTROL EDÝNÝZ!"
+      DELIMITED BY SIZE INTO WS-HATA-MESAJI
+      MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+      MOVE "08"      TO WS-RESPONSE-COUNTER
+      PERFORM HATA-VER-WORK
+      GO TO MFYS-ENTEGRASYON-EXIT
+   END-IF.
+
+   MOVE S-ISLEM-YY                 TO ENT-ISLEM-YIL   OF D-ENTEG
+   MOVE S-ISLEM-MM                 TO ENT-ISLEM-AY    OF D-ENTEG
+   MOVE S-ISLEM-DD                 TO ENT-ISLEM-GUN   OF D-ENTEG
+   MOVE S-BOLGE-KODU               TO ENT-BOLGE-KODU  OF D-ENTEG
+   MOVE IOMERKEZ-NO OF D-OZET      TO ENT-MERKEZ-NO   OF D-ENTEG
+   MOVE IOSUBE-NO   OF D-OZET      TO ENT-SUBE-NO     OF D-ENTEG
+   MOVE IOGISE-NO   OF D-OZET      TO ENT-GISE-NO     OF D-ENTEG
+   MOVE FUNCTION CURRENT-DATE(1:4) TO ENT-SISTEM-YIL  OF D-ENTEG
+   MOVE FUNCTION CURRENT-DATE(5:2) TO ENT-SISTEM-AY   OF D-ENTEG
+   MOVE FUNCTION CURRENT-DATE(7:2) TO ENT-SISTEM-GUN  OF D-ENTEG
+   MOVE FUNCTION CURRENT-DATE(9:8) TO ENT-SISTEM-SAAT OF D-ENTEG
+
+*******************
+*1-TAHSILAT       *
+*2-TEDIYE         *
+*3-ATM TAHSILAT   *
+*4-ATM TEDIYE     *
+*******************
+
+*    IF IOISLEM-TURU OF D-OZET > "8000"
+*       IF CARPAN OF D-ISLEMTUR = 2
+*          MOVE 3 TO ENT-ISLEM-TIPI OF D-ENTEG
+*       ELSE
+*          IF CARPAN OF D-ISLEMTUR = 0
+*             MOVE 4 TO ENT-ISLEM-TIPI OF D-ENTEG
+*          END-IF
+*       END-IF
+*    ELSE
+       IF CARPAN OF D-ISLEMTUR = 2
+          IF IOSUBE-NO OF D-OZET = 99
+              MOVE 5 TO ENT-ISLEM-TIPI OF D-ENTEG
+          ELSE
+              MOVE 1 TO ENT-ISLEM-TIPI OF D-ENTEG
+          END-IF
+       ELSE
+          IF CARPAN OF D-ISLEMTUR = 0
+             IF IOSUBE-NO OF D-OZET = 99
+                MOVE 6 TO ENT-ISLEM-TIPI OF D-ENTEG
+             ELSE
+                MOVE 2 TO ENT-ISLEM-TIPI OF D-ENTEG
+             END-IF
+          END-IF
+       END-IF
+*    END-IF
+
+
+   MOVE IOTUTAR     OF D-OZET      TO S-ENT-TUTAR
+   MOVE IOTUTAR1    OF D-OZET      TO S-ENT-TUTAR1
+   MOVE IOTUTAR2    OF D-OZET      TO S-ENT-TUTAR2
+   MOVE IOTUTAR3    OF D-OZET      TO S-ENT-TUTAR3
+   MOVE IOTUTAR4    OF D-OZET      TO S-ENT-TUTAR4
+   MOVE IOTUTAR5    OF D-OZET      TO S-ENT-TUTAR5
+   MOVE IOTUTAR6    OF D-OZET      TO S-ENT-TUTAR6
+   MOVE IOTUTAR7    OF D-OZET      TO S-ENT-TUTAR7
+   MOVE IOTUTAR8    OF D-OZET      TO S-ENT-TUTAR8
+   MOVE IOTUTAR9    OF D-OZET      TO S-ENT-TUTAR9
+   MOVE IOTUTAR10   OF D-OZET      TO S-ENT-TUTAR10
+   MOVE IOTUTAR11   OF D-OZET      TO S-ENT-TUTAR11
+   MOVE IOTUTAR12   OF D-OZET      TO S-ENT-TUTAR12
+   MOVE IOADET      OF D-OZET      TO ENT-ISLEM-ADET OF D-ENTEG
+
+*herhangi bir kuruma ait tahsilat parasinin tamami degil komisyonu
+*dusulup kalan tutar ilgili hesapta muhasebelesiyorsa
+
+   IF KOMISYON OF D-ISLEMTUR < 100
+      COMPUTE S-ENT-KOMISYON ROUNDED = IOTUTAR OF D-OZET *
+                                    ((100 - KOMISYON OF D-ISLEMTUR) / 100)
+      COMPUTE S-ENT-TUTAR ROUNDED = IOTUTAR OF D-OZET - S-ENT-KOMISYON
+      SET WS-KOMISYON-VAR-FLAG TO TRUE
+   ELSE
+      MOVE IOTUTAR OF D-OZET TO S-ENT-TUTAR
+      MOVE 0                 TO S-ENT-KOMISYON
+   END-IF.
+
+   IF IOISLEM-TURU OF D-OZET = "2100" AND NOT PARA-TURU OF D-OZET = "TL "
+      COMPUTE S-ENT-TUTAR ROUNDED = IOTUTAR  OF D-OZET + IOTUTAR2 OF D-OZET
+      COMPUTE S-ENT-TUTAR5 ROUNDED = S-ENT-TUTAR * PARA-KURU OF D-OZET
+   END-IF.
+
+   IF IOISLEM-TURU OF D-OZET = "2100" AND NOT (PARA-TURU OF D-OZET = "TL ")
+      COMPUTE S-ENT-TUTAR2 ROUNDED = (IOTUTAR2 OF D-OZET * (0.28) ) *
+                                      PARA-KURU OF D-OZET
+      COMPUTE S-ENT-TUTAR5 ROUNDED = ((IOTUTAR2 - (IOTUTAR2 * (0.28))) *
+                                      PARA-KURU OF D-OZET )
+   END-IF.
+
+   IF IOISLEM-TURU OF D-OZET = "2100" AND PARA-TURU OF D-OZET = "TL "
+      COMPUTE S-ENT-TUTAR2 ROUNDED = IOTUTAR2 OF D-OZET * (0.28)
+      COMPUTE S-ENT-TUTAR5 ROUNDED = IOTUTAR2 - (IOTUTAR2 OF D-OZET * (0.28))
+   END-IF.
+
+   IF IOISLEM-TURU OF D-OZET = "2200" AND
+     (PARA-TURU OF D-OZET = "YTL" OR
+      PARA-TURU OF D-OZET = "TRL" OR
+      PARA-TURU OF D-OZET = "TL " )
+      MOVE 0 TO IOTUTAR OF D-OZET, S-ENT-TUTAR
+   END-IF.
+
+   IF IOISLEM-TURU OF D-OZET = "7200" AND PARA-TURU OF D-OZET = "TL "
+      COMPUTE S-ENT-TUTAR7 ROUNDED = (IOTUTAR7 OF D-OZET -
+                                      IOTUTAR10 OF D-OZET) * (0.50)
+      COMPUTE S-ENT-TUTAR2 ROUNDED = IOTUTAR2 OF D-OZET - S-ENT-TUTAR7
+      MOVE 0 TO IOTUTAR10 OF D-OZET, S-ENT-TUTAR10
+   END-IF.
+
+   IF IOISLEM-TURU OF D-OZET = "3286"
+      MOVE 0 TO IOTUTAR1  OF D-OZET, S-ENT-TUTAR1,
+                IOTUTAR2  OF D-OZET, S-ENT-TUTAR2,
+                IOTUTAR3  OF D-OZET, S-ENT-TUTAR3,
+                IOTUTAR4  OF D-OZET, S-ENT-TUTAR4,
+                IOTUTAR5  OF D-OZET, S-ENT-TUTAR5,
+                IOTUTAR6  OF D-OZET, S-ENT-TUTAR6,
+                IOTUTAR7  OF D-OZET, S-ENT-TUTAR7,
+                IOTUTAR8  OF D-OZET, S-ENT-TUTAR8,
+                IOTUTAR9  OF D-OZET, S-ENT-TUTAR9,
+                IOTUTAR10 OF D-OZET, S-ENT-TUTAR10,
+                IOTUTAR11 OF D-OZET, S-ENT-TUTAR11,
+                IOTUTAR12 OF D-OZET, S-ENT-TUTAR12
+   END-IF.
+
+   IF IOISLEM-TURU OF D-OZET = "3142" OR
+      IOISLEM-TURU OF D-OZET = "3148" OR
+      IOISLEM-TURU OF D-OZET = "3169" OR
+      IOISLEM-TURU OF D-OZET = "3334"
+      MOVE 0 TO IOTUTAR1  OF D-OZET, S-ENT-TUTAR1,
+                IOTUTAR2  OF D-OZET, S-ENT-TUTAR2,
+                IOTUTAR3  OF D-OZET, S-ENT-TUTAR3,
+                IOTUTAR4  OF D-OZET, S-ENT-TUTAR4,
+                IOTUTAR5  OF D-OZET, S-ENT-TUTAR5,
+                IOTUTAR6  OF D-OZET, S-ENT-TUTAR6,
+                IOTUTAR7  OF D-OZET, S-ENT-TUTAR7,
+                IOTUTAR8  OF D-OZET, S-ENT-TUTAR8,
+                IOTUTAR9  OF D-OZET, S-ENT-TUTAR9,
+                IOTUTAR10 OF D-OZET, S-ENT-TUTAR10,
+                IOTUTAR11 OF D-OZET, S-ENT-TUTAR11,
+                IOTUTAR12 OF D-OZET, S-ENT-TUTAR12
+   END-IF.
+
+   IF IOISLEM-TURU OF D-OZET = "5100" AND PARA-TURU OF D-OZET = "TL "
+      MOVE 0 TO IOTUTAR2 OF D-OZET, S-ENT-TUTAR2
+      MOVE 0 TO IOTUTAR3 OF D-OZET, S-ENT-TUTAR3
+   END-IF.
+
+*burada ozet ve mfys tablosundan yapilan selectin sonucunda gelen cevaptaki
+*iotutar,iotutar1,iotutar2..............iotutar12 kolonlarin hepsi icin
+*sifirdan farkli ise mfys_entegrasyon tablosuna kayit insert edilmesi icin
+*gerekli hesaplamalar yapiliyor.
+
+ IF S-ENT-TUTAR NOT EQUAL 0
+    IF MUH-HES-REF-NO OF D-ISLEMTUR = SPACE
+    if not (islem-turu of d-islemtur = "1210" or
+            islem-turu of d-islemtur = "1211" or
+            islem-turu of d-islemtur = "2100" or
+            islem-turu of d-islemtur = "5100" or
+            islem-turu of d-islemtur = "7100" or
+            islem-turu of d-islemtur = "7200")
+         DISPLAY " OZET TABLOSUNDAKI TUTAR KOLONUNDA DEGER OLDUGU HALDE "
+         DISPLAY " ISLEMTUR TABLOSUNDAKI MUH-HES-REF-NO KOLONUNDA "
+         DISPLAY " HESAP-NO BILGISI YOK. TUTAR KOLONUNDAKI DEGER ICIN "
+         DISPLAY " MUHASEBELESTIRME YAPILMIYOR, TIKKAT TIKKAT! "
+         DISPLAY " ISLEM TURU : " ISLEM-TURU OF D-ISLEMTUR
+    end-if
+    ELSE
+       INITIALIZE D-HESPLAN, WS-FLAG6, WS-FLAG15
+       MOVE MUH-HES-REF-NO OF D-ISLEMTUR TO GMU-HESAP-REF-NO OF D-HESPLAN
+       IF MUH-HES-REF-NO OF D-ISLEMTUR = SPACE
+          MOVE MUH-HES-REF-NO1 TO GMU-HESAP-REF-NO OF D-HESPLAN
+       END-IF
+       PERFORM SELECT-HESAP-PLANI
+       IF NOT (GMU-ODEME-KODU OF D-HESPLAN = "TRL" OR
+               GMU-ODEME-KODU OF D-HESPLAN = "TL " OR
+               GMU-ODEME-KODU OF D-HESPLAN = "YTL")
+          MOVE S-ENT-TUTAR TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+          IF IOISLEM-TURU OF D-OZET = "2100" AND
+             NOT PARA-TURU OF D-OZET = "TL "
+             COMPUTE ENT-TUTAR OF D-ENTEG ROUNDED = (IOTUTAR OF D-OZET +
+                                                     IOTUTAR2 OF D-OZET) *
+                                                     PARA-KURU OF D-OZET
+          ELSE
+             MOVE S-ENT-TUTAR1 TO ENT-TUTAR OF D-ENTEG
+          END-IF
+          MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+          IF IOSUBE-NO OF D-OZET NOT EQUAL 99
+             PERFORM KONTROL-KONSINYE
+          END-IF
+*---------------------------------------------------------------*
+*smart kart konsinye urun tablosunda tanimli olmamasina ragmen  *
+*diger konsinye urunler gibi dvs'den satisi yapilacagindan      *
+*ws-konsinye-flag true olarak set ediliyor ve muhasebe fisi     *
+*olusturulmuyor.                                                *
+*---------------------------------------------------------------*
+         IF WS-DVS-FLAG
+*                IF ENT-HESAP-REF-NO OF D-ENTEG = "153020000010" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "153020000001" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "153020000015" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "153020000017" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "153020000002" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "153020000004" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "153020000005" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "153020000006" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "153020000013" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "153020000014" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "153020000029" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "153020000030" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "326020000004"
+**altin hesaplari
+*            ENT-HESAP-REF-NO OF D-ENTEG = "153030000017" OR
+*            ENT-HESAP-REF-NO OF D-ENTEG = "153030000018" OR
+*            ENT-HESAP-REF-NO OF D-ENTEG = "153030000019" OR
+*            ENT-HESAP-REF-NO OF D-ENTEG = "153030000020" OR
+*            ENT-HESAP-REF-NO OF D-ENTEG = "153030000021" OR
+*            ENT-HESAP-REF-NO OF D-ENTEG = "153030000022"
+**altin hesaplari
+             SET WS-KONSINYE-FLAG TO TRUE
+          END-IF
+          IF WS-KONSINYE-FLAG
+*             PERFORM INSERT-ENT-KONSINYE
+             GO TO MFYS-ENTEGRASYON-EXIT
+          ELSE
+             PERFORM INSERT-ENTEGRS
+          END-IF
+          IF OK-MSG = 0 AND OK-MSG-ENT = 0
+             INITIALIZE WS-FLAG14
+             PERFORM FIS-ISLEMLERI
+          ELSE
+             MOVE "5921"    TO WS-RESPONSE-CODE
+             STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+             DELIMITED BY SIZE
+             "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+             MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+             MOVE "09"      TO WS-RESPONSE-COUNTER
+             PERFORM HATA-VER-WORK
+             go to mfys-entegrasyon-exit
+           END-IF
+       ELSE
+           MOVE S-ENT-TUTAR  TO ENT-TUTAR OF D-ENTEG
+           MOVE 0 TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+           MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+           IF IOSUBE-NO OF D-OZET NOT EQUAL 99
+              PERFORM KONTROL-KONSINYE
+           END-IF
+*---------------------------------------------------------------*
+*smart kart konsinye urun tablosunda tanimli olmamasina ragmen  *
+*diger konsinye urunler gibi dvs'den satisi yapilacagindan      *
+*ws-konsinye-flag true olarak set ediliyor ve muhasebe fisi     *
+*olusturulmuyor.                                                *
+*---------------------------------------------------------------*
+         IF WS-DVS-FLAG
+*                IF ENT-HESAP-REF-NO OF D-ENTEG = "153020000010" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "153020000001" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "153020000015" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "153020000017" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "153020000002" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "153020000004" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "153020000005" OR
+*            ENT-HESAP-REF-NO OF D-ENTEG = "153020000006" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "153020000013" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "153020000014" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "153020000029" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "153020000030" OR
+*             ENT-HESAP-REF-NO OF D-ENTEG = "326020000004"
+**altin hesaplari
+*            ENT-HESAP-REF-NO OF D-ENTEG = "153030000017" OR
+*            ENT-HESAP-REF-NO OF D-ENTEG = "153030000018" OR
+*            ENT-HESAP-REF-NO OF D-ENTEG = "153030000019" OR
+*            ENT-HESAP-REF-NO OF D-ENTEG = "153030000020" OR
+*            ENT-HESAP-REF-NO OF D-ENTEG = "153030000021" OR
+*            ENT-HESAP-REF-NO OF D-ENTEG = "153030000022"
+**altin hesaplari
+             SET WS-KONSINYE-FLAG TO TRUE
+          END-IF
+           IF WS-KONSINYE-FLAG
+*              PERFORM INSERT-ENT-KONSINYE
+              GO TO MFYS-ENTEGRASYON-EXIT
+           ELSE
+              PERFORM INSERT-ENTEGRS
+           END-IF
+           IF OK-MSG = 0 AND OK-MSG-ENT = 0
+              INITIALIZE WS-FLAG14
+              PERFORM FIS-ISLEMLERI
+           ELSE
+              MOVE "5921"    TO WS-RESPONSE-CODE
+              STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+              DELIMITED BY SIZE
+              "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+              MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+              MOVE "09"      TO WS-RESPONSE-COUNTER
+              PERFORM HATA-VER-WORK
+              go to mfys-entegrasyon-exit
+          END-IF
+       END-IF
+    END-IF
+  END-IF.
+
+ IF S-ENT-TUTAR1 NOT EQUAL 0
+    IF MUH-HES-REF-NO1 OF D-ISLEMTUR = SPACE
+    if not (islem-turu of d-islemtur = "1210" or
+            islem-turu of d-islemtur = "1211" or
+            islem-turu of d-islemtur = "2100" or
+            islem-turu of d-islemtur = "5100" or
+            islem-turu of d-islemtur = "7100" or
+            islem-turu of d-islemtur = "7200")
+          DISPLAY " OZET TABLOSUNDAKI TUTAR1 KOLONUNDA DEGER OLDUGU HALDE "
+          DISPLAY " ISLEMTUR TABLOSUNDAKI MUH-HES-REF-NO1 KOLONUNDA "
+          DISPLAY " HESAP-NO BILGISI YOK. TUTAR KOLONUNDAKI DEGER ICIN "
+          DISPLAY " MUHASEBELESTIRME YAPILMIYOR, TIKKAT TIKKAT! "
+          DISPLAY " ISLEM TURU : " ISLEM-TURU OF D-ISLEMTUR
+    end-if
+    ELSE
+       IF ISLEM-TURU OF D-ISLEMTUR = "5100"
+          MOVE 2 TO CARPAN OF D-ISLEMTUR
+       END-IF
+       INITIALIZE D-HESPLAN, WS-FLAG6, WS-FLAG15
+  IF s-acente-sicil-no = 999998 and IOISLEM-TURU  OF D-OZET = "3951"
+    and IOMERKEZ-NO OF D-OZET = 50928
+*     and IOMERKEZ-NO OF D-OZET = 50003
+*     MOVE "600100000884"    TO GMU-HESAP-REF-NO OF D-HESPLAN
+         move "600100000942"    TO GMU-HESAP-REF-NO OF D-HESPLAN
+  else
+     MOVE MUH-HES-REF-NO1 OF D-ISLEMTUR TO GMU-HESAP-REF-NO OF D-HESPLAN
+   END-IF
+       IF MUH-HES-REF-NO OF D-ISLEMTUR = SPACE
+          MOVE MUH-HES-REF-NO1 TO GMU-HESAP-REF-NO OF D-HESPLAN
+       END-IF
+       PERFORM SELECT-HESAP-PLANI
+       IF NOT (GMU-ODEME-KODU OF D-HESPLAN = "TRL" OR
+               GMU-ODEME-KODU OF D-HESPLAN = "TL " OR
+               GMU-ODEME-KODU OF D-HESPLAN = "YTL")
+               MOVE S-ENT-TUTAR TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+               MOVE S-ENT-TUTAR1 TO ENT-TUTAR OF D-ENTEG
+             MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+               PERFORM INSERT-ENTEGRS
+          IF OK-MSG = 0 AND OK-MSG-ENT = 0
+             PERFORM FIS-ISLEMLERI
+          ELSE
+             MOVE "5921"    TO WS-RESPONSE-CODE
+             STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+             DELIMITED BY SIZE
+             "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+             MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+             MOVE "09"      TO WS-RESPONSE-COUNTER
+             PERFORM HATA-VER-WORK
+              END-IF
+       ELSE
+         MOVE S-ENT-TUTAR1 TO ENT-TUTAR OF D-ENTEG
+         MOVE 0 TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+         MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+         PERFORM INSERT-ENTEGRS
+         IF IOSUBE-NO OF D-OZET = 99
+            SET WS-ACENTE-ROW-DEVAM-FLAG TO TRUE
+         END-IF
+         IF OK-MSG = 0 AND OK-MSG-ENT = 0
+            PERFORM FIS-ISLEMLERI
+         ELSE
+            MOVE "5921"    TO WS-RESPONSE-CODE
+            STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+            DELIMITED BY SIZE
+            "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+            MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+            MOVE "09"      TO WS-RESPONSE-COUNTER
+            PERFORM HATA-VER-WORK
+         END-IF
+      END-IF
+    END-IF
+  END-IF.
+
+ IF S-ENT-TUTAR2 NOT EQUAL 0
+    INITIALIZE D-HESPLAN, WS-FLAG6, WS-FLAG15
+    MOVE MUH-HES-REF-NO2 OF D-ISLEMTUR TO GMU-HESAP-REF-NO OF D-HESPLAN
+    IF MUH-HES-REF-NO OF D-ISLEMTUR = SPACE
+       MOVE MUH-HES-REF-NO2 TO GMU-HESAP-REF-NO OF D-HESPLAN
+    END-IF
+    PERFORM SELECT-HESAP-PLANI
+    IF NOT (GMU-ODEME-KODU OF D-HESPLAN = "TRL" OR
+            GMU-ODEME-KODU OF D-HESPLAN = "TL " OR
+            GMU-ODEME-KODU OF D-HESPLAN = "YTL")
+       MOVE S-ENT-TUTAR TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+**     COMPUTE S-ENT-TUTAR ROUNDED = S-ENT-TUTAR * ENT-DOVIZ-KURU  OF D-ENTEG
+       MOVE S-ENT-TUTAR2 TO ENT-TUTAR OF D-ENTEG
+       MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+       PERFORM INSERT-ENTEGRS
+       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+          PERFORM FIS-ISLEMLERI
+       ELSE
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+       END-IF
+    ELSE
+       MOVE S-ENT-TUTAR2 TO ENT-TUTAR OF D-ENTEG
+       MOVE 0 TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+       MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+       PERFORM INSERT-ENTEGRS
+       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+          PERFORM FIS-ISLEMLERI
+       ELSE
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+       END-IF
+    END-IF
+  END-IF.
+
+ IF S-ENT-TUTAR3 NOT EQUAL 0
+    INITIALIZE D-HESPLAN, WS-FLAG6, WS-FLAG15
+    MOVE MUH-HES-REF-NO3 OF D-ISLEMTUR TO GMU-HESAP-REF-NO OF D-HESPLAN
+    IF MUH-HES-REF-NO OF D-ISLEMTUR = SPACE
+       MOVE MUH-HES-REF-NO3 TO GMU-HESAP-REF-NO OF D-HESPLAN
+    END-IF
+    PERFORM SELECT-HESAP-PLANI
+    IF NOT (GMU-ODEME-KODU OF D-HESPLAN = "TRL" OR
+            GMU-ODEME-KODU OF D-HESPLAN = "TL " OR
+            GMU-ODEME-KODU OF D-HESPLAN = "YTL")
+       MOVE S-ENT-TUTAR TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+**     COMPUTE S-ENT-TUTAR ROUNDED = S-ENT-TUTAR * ENT-DOVIZ-KURU  OF D-ENTEG
+       MOVE S-ENT-TUTAR3 TO ENT-TUTAR OF D-ENTEG
+       MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+       PERFORM INSERT-ENTEGRS
+       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+          PERFORM FIS-ISLEMLERI
+       ELSE
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+       END-IF
+    ELSE
+       MOVE S-ENT-TUTAR3 TO ENT-TUTAR OF D-ENTEG
+       MOVE 0 TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+       MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+       PERFORM INSERT-ENTEGRS
+       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+          PERFORM FIS-ISLEMLERI
+       ELSE
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+       END-IF
+    END-IF
+  END-IF.
+
+ IF S-ENT-TUTAR4 NOT EQUAL 0
+    INITIALIZE D-HESPLAN, WS-FLAG6, WS-FLAG15
+    MOVE MUH-HES-REF-NO4 OF D-ISLEMTUR TO GMU-HESAP-REF-NO OF D-HESPLAN
+    IF MUH-HES-REF-NO OF D-ISLEMTUR = SPACE
+       MOVE MUH-HES-REF-NO4 TO GMU-HESAP-REF-NO OF D-HESPLAN
+    END-IF
+    PERFORM SELECT-HESAP-PLANI
+    IF NOT (GMU-ODEME-KODU OF D-HESPLAN = "TRL" OR
+            GMU-ODEME-KODU OF D-HESPLAN = "TL " OR
+            GMU-ODEME-KODU OF D-HESPLAN = "YTL")
+       MOVE S-ENT-TUTAR TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+**     COMPUTE S-ENT-TUTAR ROUNDED = S-ENT-TUTAR * ENT-DOVIZ-KURU  OF D-ENTEG
+       MOVE S-ENT-TUTAR4 TO ENT-TUTAR OF D-ENTEG
+       MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+       PERFORM INSERT-ENTEGRS
+       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+          PERFORM FIS-ISLEMLERI
+       ELSE
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+       END-IF
+    ELSE
+       MOVE S-ENT-TUTAR4 TO ENT-TUTAR OF D-ENTEG
+       MOVE 0 TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+       MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+       PERFORM INSERT-ENTEGRS
+       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+          PERFORM FIS-ISLEMLERI
+       ELSE
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+       END-IF
+    END-IF
+  END-IF.
+
+   IF S-ENT-TUTAR5 NOT EQUAL 0
+    INITIALIZE D-HESPLAN, WS-FLAG6, WS-FLAG15
+    MOVE MUH-HES-REF-NO5 OF D-ISLEMTUR TO GMU-HESAP-REF-NO OF D-HESPLAN
+    IF MUH-HES-REF-NO OF D-ISLEMTUR = SPACE
+       MOVE MUH-HES-REF-NO5 TO GMU-HESAP-REF-NO OF D-HESPLAN
+    END-IF
+    PERFORM SELECT-HESAP-PLANI
+    IF NOT (GMU-ODEME-KODU OF D-HESPLAN = "TRL" OR
+            GMU-ODEME-KODU OF D-HESPLAN = "TL " OR
+            GMU-ODEME-KODU OF D-HESPLAN = "YTL")
+       MOVE S-ENT-TUTAR TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+**     COMPUTE S-ENT-TUTAR ROUNDED = S-ENT-TUTAR * ENT-DOVIZ-KURU  OF D-ENTEG
+       MOVE S-ENT-TUTAR5 TO ENT-TUTAR OF D-ENTEG
+       MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+       PERFORM INSERT-ENTEGRS
+       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+          PERFORM FIS-ISLEMLERI
+       ELSE
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+       END-IF
+    ELSE
+       MOVE S-ENT-TUTAR5 TO ENT-TUTAR OF D-ENTEG
+       MOVE 0 TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+       MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+       PERFORM INSERT-ENTEGRS
+       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+          PERFORM FIS-ISLEMLERI
+       ELSE
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+       END-IF
+    END-IF
+  END-IF.
+
+   IF S-ENT-TUTAR6 NOT EQUAL 0
+    INITIALIZE D-HESPLAN, WS-FLAG6, WS-FLAG15
+    MOVE MUH-HES-REF-NO6 OF D-ISLEMTUR TO GMU-HESAP-REF-NO OF D-HESPLAN
+    IF MUH-HES-REF-NO OF D-ISLEMTUR = SPACE
+       MOVE MUH-HES-REF-NO6 TO GMU-HESAP-REF-NO OF D-HESPLAN
+    END-IF
+    PERFORM SELECT-HESAP-PLANI
+    IF NOT (GMU-ODEME-KODU OF D-HESPLAN = "TRL" OR
+            GMU-ODEME-KODU OF D-HESPLAN = "TL " OR
+            GMU-ODEME-KODU OF D-HESPLAN = "YTL")
+       MOVE S-ENT-TUTAR TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+**     COMPUTE S-ENT-TUTAR ROUNDED = S-ENT-TUTAR * ENT-DOVIZ-KURU  OF D-ENTEG
+       MOVE S-ENT-TUTAR6 TO ENT-TUTAR OF D-ENTEG
+       MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+       PERFORM INSERT-ENTEGRS
+       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+          PERFORM FIS-ISLEMLERI
+       ELSE
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+       END-IF
+    ELSE
+       MOVE S-ENT-TUTAR6 TO ENT-TUTAR OF D-ENTEG
+       MOVE 0 TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+       MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+       PERFORM INSERT-ENTEGRS
+       IF IOSUBE-NO OF D-OZET = 99
+          SET WS-ACENTE-ROW-DEVAM-FLAG TO TRUE
+       END-IF
+       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+          PERFORM FIS-ISLEMLERI
+       ELSE
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+       END-IF
+    END-IF
+  END-IF.
+
+  IF S-ENT-TUTAR7 NOT EQUAL 0
+    INITIALIZE D-HESPLAN, WS-FLAG6, WS-FLAG15
+    MOVE MUH-HES-REF-NO7 OF D-ISLEMTUR TO GMU-HESAP-REF-NO OF D-HESPLAN
+
+    IF MUH-HES-REF-NO OF D-ISLEMTUR = SPACE
+       MOVE MUH-HES-REF-NO7 TO GMU-HESAP-REF-NO OF D-HESPLAN
+    END-IF
+    PERFORM SELECT-HESAP-PLANI
+    IF NOT (GMU-ODEME-KODU OF D-HESPLAN = "TRL" OR
+            GMU-ODEME-KODU OF D-HESPLAN = "TL " OR
+            GMU-ODEME-KODU OF D-HESPLAN = "YTL")
+       MOVE S-ENT-TUTAR TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+**     COMPUTE S-ENT-TUTAR ROUNDED = S-ENT-TUTAR * ENT-DOVIZ-KURU  OF D-ENTEG
+       MOVE S-ENT-TUTAR7 TO ENT-TUTAR OF D-ENTEG
+       MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+       PERFORM INSERT-ENTEGRS
+       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+          PERFORM FIS-ISLEMLERI
+       ELSE
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+       END-IF
+    ELSE
+       MOVE S-ENT-TUTAR7 TO ENT-TUTAR OF D-ENTEG
+       MOVE 0 TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+       MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+       PERFORM INSERT-ENTEGRS
+       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+          PERFORM FIS-ISLEMLERI
+       ELSE
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+       END-IF
+    END-IF
+  END-IF.
+
+  IF S-ENT-TUTAR8 NOT EQUAL 0
+    INITIALIZE D-HESPLAN, WS-FLAG6, WS-FLAG15
+    MOVE MUH-HES-REF-NO8 OF D-ISLEMTUR TO GMU-HESAP-REF-NO OF D-HESPLAN
+    IF MUH-HES-REF-NO OF D-ISLEMTUR = SPACE
+       MOVE MUH-HES-REF-NO8 TO GMU-HESAP-REF-NO OF D-HESPLAN
+    END-IF
+    PERFORM SELECT-HESAP-PLANI
+    IF NOT (GMU-ODEME-KODU OF D-HESPLAN = "TRL" OR
+            GMU-ODEME-KODU OF D-HESPLAN = "TL " OR
+            GMU-ODEME-KODU OF D-HESPLAN = "YTL")
+       MOVE S-ENT-TUTAR TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+**     COMPUTE S-ENT-TUTAR ROUNDED = S-ENT-TUTAR * ENT-DOVIZ-KURU  OF D-ENTEG
+       MOVE S-ENT-TUTAR8 TO ENT-TUTAR OF D-ENTEG
+       MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+       PERFORM INSERT-ENTEGRS
+       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+          PERFORM FIS-ISLEMLERI
+       ELSE
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+       END-IF
+    ELSE
+       MOVE S-ENT-TUTAR8 TO ENT-TUTAR OF D-ENTEG
+       MOVE 0 TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+       MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+       PERFORM INSERT-ENTEGRS
+       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+          PERFORM FIS-ISLEMLERI
+       ELSE
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+       END-IF
+    END-IF
+  END-IF.
+
+  IF S-ENT-TUTAR9 NOT EQUAL 0
+    INITIALIZE D-HESPLAN, WS-FLAG6, WS-FLAG15
+*   if
+*     ENT-BOLGE-KODU  OF D-ENTEG = 200 and
+*     ENT-MERKEZ-NO   OF D-ENTEG = 50003
+*     move 320050000161 to MUH-HES-REF-NO9 OF D-ISLEMTUR
+*   end-if
+    MOVE MUH-HES-REF-NO9 OF D-ISLEMTUR TO GMU-HESAP-REF-NO OF D-HESPLAN
+    IF MUH-HES-REF-NO OF D-ISLEMTUR = SPACE
+       MOVE MUH-HES-REF-NO9 TO GMU-HESAP-REF-NO OF D-HESPLAN
+    END-IF
+    PERFORM SELECT-HESAP-PLANI
+    IF NOT (GMU-ODEME-KODU OF D-HESPLAN = "TRL" OR
+            GMU-ODEME-KODU OF D-HESPLAN = "TL " OR
+            GMU-ODEME-KODU OF D-HESPLAN = "YTL")
+       MOVE S-ENT-TUTAR TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+**     COMPUTE S-ENT-TUTAR ROUNDED = S-ENT-TUTAR * ENT-DOVIZ-KURU  OF D-ENTEG
+       MOVE S-ENT-TUTAR9 TO ENT-TUTAR OF D-ENTEG
+       MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+       PERFORM INSERT-ENTEGRS
+       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+          PERFORM FIS-ISLEMLERI
+       ELSE
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+       END-IF
+    ELSE
+       MOVE S-ENT-TUTAR9 TO ENT-TUTAR OF D-ENTEG
+       MOVE 0 TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+       MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+       PERFORM INSERT-ENTEGRS
+       IF IOSUBE-NO OF D-OZET = 99
+          SET WS-ACENTE-ROW-DEVAM-FLAG TO TRUE
+       END-IF
+       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+          PERFORM FIS-ISLEMLERI
+       ELSE
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+       END-IF
+    END-IF
+  END-IF.
+
+  IF S-ENT-TUTAR10 NOT EQUAL 0
+    INITIALIZE D-HESPLAN, WS-FLAG6, WS-FLAG15
+    MOVE MUH-HES-REF-NO10 OF D-ISLEMTUR TO GMU-HESAP-REF-NO OF D-HESPLAN
+    IF MUH-HES-REF-NO OF D-ISLEMTUR = SPACE
+       MOVE MUH-HES-REF-NO10 TO GMU-HESAP-REF-NO OF D-HESPLAN
+    END-IF
+    PERFORM SELECT-HESAP-PLANI
+    IF NOT (GMU-ODEME-KODU OF D-HESPLAN = "TRL" OR
+            GMU-ODEME-KODU OF D-HESPLAN = "TL " OR
+            GMU-ODEME-KODU OF D-HESPLAN = "YTL")
+       MOVE S-ENT-TUTAR TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+**     COMPUTE S-ENT-TUTAR ROUNDED = S-ENT-TUTAR * ENT-DOVIZ-KURU  OF D-ENTEG
+       MOVE S-ENT-TUTAR10 TO ENT-TUTAR OF D-ENTEG
+       MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+       PERFORM INSERT-ENTEGRS
+       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+          PERFORM FIS-ISLEMLERI
+       ELSE
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+       END-IF
+    ELSE
+       MOVE S-ENT-TUTAR10 TO ENT-TUTAR OF D-ENTEG
+       MOVE 0 TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+       MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+       PERFORM INSERT-ENTEGRS
+       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+          PERFORM FIS-ISLEMLERI
+       ELSE
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+       END-IF
+    END-IF
+  END-IF.
+
+* IF S-ENT-TUTAR11 NOT EQUAL 0
+*   INITIALIZE D-HESPLAN
+*   MOVE MUH-HES-REF-NO11 OF D-ISLEMTUR TO GMU-HESAP-REF-NO OF D-HESPLAN
+*   IF MUH-HES-REF-NO OF D-ISLEMTUR = SPACE
+*      MOVE MUH-HES-REF-NO11 TO GMU-HESAP-REF-NO OF D-HESPLAN
+*   END-IF
+*   PERFORM SELECT-HESAP-PLANI
+*   IF NOT (GMU-ODEME-KODU OF D-HESPLAN = "TRL" OR
+*           GMU-ODEME-KODU OF D-HESPLAN = "TL " OR
+*           GMU-ODEME-KODU OF D-HESPLAN = "YTL")
+*      MOVE S-ENT-TUTAR TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+**     COMPUTE S-ENT-TUTAR ROUNDED = S-ENT-TUTAR * ENT-DOVIZ-KURU  OF D-ENTEG
+*      MOVE S-ENT-TUTAR11 TO ENT-TUTAR OF D-ENTEG
+*      MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+*      PERFORM INSERT-ENTEGRS
+*      IF OK-MSG = 0 AND OK-MSG-ENT = 0
+*         PERFORM FIS-ISLEMLERI
+*      ELSE
+*         MOVE "5921"    TO WS-RESPONSE-CODE
+*         STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+*         DELIMITED BY SIZE
+*         "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+*         MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+*         MOVE "09"      TO WS-RESPONSE-COUNTER
+*         PERFORM HATA-VER-WORK
+*      END-IF
+*   ELSE
+*      MOVE S-ENT-TUTAR11 TO ENT-TUTAR OF D-ENTEG
+*      MOVE 0 TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+*      MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+*      PERFORM INSERT-ENTEGRS
+*      IF OK-MSG = 0 AND OK-MSG-ENT = 0
+*         PERFORM FIS-ISLEMLERI
+*      ELSE
+*         MOVE "5921"    TO WS-RESPONSE-CODE
+*         STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+*         DELIMITED BY SIZE
+*         "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+*         MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+*         MOVE "09"      TO WS-RESPONSE-COUNTER
+*         PERFORM HATA-VER-WORK
+*      END-IF
+*   END-IF
+* END-IF.
+
+  IF S-ENT-TUTAR12 NOT EQUAL 0
+    IF MUH-HES-REF-NO12 OF D-ISLEMTUR = SPACE
+       DISPLAY " OZET TABLOSUNDAKI TUTAR KOLONUNDA DEGER OLDUGU HALDE "
+       DISPLAY " ISLEMTUR TABLOSUNDAKI MUH-HES-REF-NO KOLONUNDA "
+       DISPLAY " HESAP-NO BILGISI YOK. TUTAR KOLONUNDAKI DEGER ICIN "
+       DISPLAY " MUHASEBELESTIRME YAPILMIYOR, TIKKAT TIKKAT! "
+       DISPLAY " ISLEM TURU : " ISLEM-TURU OF D-ISLEMTUR
+    ELSE
+
+       INITIALIZE D-HESPLAN, WS-FLAG6, WS-FLAG15
+       MOVE MUH-HES-REF-NO12 OF D-ISLEMTUR TO GMU-HESAP-REF-NO OF D-HESPLAN
+       IF MUH-HES-REF-NO OF D-ISLEMTUR = SPACE
+          MOVE MUH-HES-REF-NO12 TO GMU-HESAP-REF-NO OF D-HESPLAN
+       END-IF
+       PERFORM SELECT-HESAP-PLANI
+       IF NOT (GMU-ODEME-KODU OF D-HESPLAN = "TRL" OR
+               GMU-ODEME-KODU OF D-HESPLAN = "TL " OR
+               GMU-ODEME-KODU OF D-HESPLAN = "YTL")
+          MOVE S-ENT-TUTAR TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+**      COMPUTE S-ENT-TUTAR ROUNDED = S-ENT-TUTAR * ENT-DOVIZ-KURU  OF D-ENTEG
+          MOVE S-ENT-TUTAR12 TO ENT-TUTAR OF D-ENTEG
+          MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+          PERFORM INSERT-ENTEGRS
+          IF OK-MSG = 0 AND OK-MSG-ENT = 0
+             PERFORM FIS-ISLEMLERI
+          ELSE
+             MOVE "5921"    TO WS-RESPONSE-CODE
+             STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+             DELIMITED BY SIZE
+             "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+             MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+             MOVE "09"      TO WS-RESPONSE-COUNTER
+             PERFORM HATA-VER-WORK
+          END-IF
+       ELSE
+          MOVE S-ENT-TUTAR12 TO ENT-TUTAR OF D-ENTEG
+          MOVE 0 TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+          MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+          PERFORM INSERT-ENTEGRS
+          IF OK-MSG = 0 AND OK-MSG-ENT = 0
+             PERFORM FIS-ISLEMLERI
+          ELSE
+             MOVE "5921"    TO WS-RESPONSE-CODE
+             STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+             DELIMITED BY SIZE
+             "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+             MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+             MOVE "09"      TO WS-RESPONSE-COUNTER
+             PERFORM HATA-VER-WORK
+          END-IF
+       END-IF
+   END-IF
+  END-IF.
+
+**eger kurumdan alinan komisyon islem aninda dusuluyorsa kesilen
+**komisyon da muhasebelesiyor.
+
+  IF WS-KOMISYON-VAR-FLAG AND S-ENT-KOMISYON > 0
+    INITIALIZE D-HESPLAN, WS-FLAG6, WS-FLAG15
+    MOVE MUH-KOM-HES-REF-NO OF D-ISLEMTUR TO GMU-HESAP-REF-NO OF D-HESPLAN
+    PERFORM SELECT-HESAP-PLANI
+    IF NOT (GMU-ODEME-KODU OF D-HESPLAN = "TRL" OR
+            GMU-ODEME-KODU OF D-HESPLAN = "TL " OR
+            GMU-ODEME-KODU OF D-HESPLAN = "YTL")
+       MOVE S-ENT-KOMISYON TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+       MOVE S-ENT-KOMISYON TO ENT-TUTAR OF D-ENTEG
+       MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+       PERFORM INSERT-ENTEGRS
+       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+          PERFORM FIS-ISLEMLERI
+       ELSE
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+       END-IF
+    ELSE
+         MOVE S-ENT-KOMISYON TO ENT-TUTAR OF D-ENTEG
+         MOVE 0 TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+         MOVE GMU-HESAP-REF-NO OF D-HESPLAN TO ENT-HESAP-REF-NO OF D-ENTEG
+         PERFORM INSERT-ENTEGRS
+         IF IOSUBE-NO OF D-OZET = 99
+            SET WS-ACENTE-ROW-DEVAM-FLAG TO TRUE
+         END-IF
+         IF OK-MSG = 0 AND OK-MSG-ENT = 0
+            PERFORM FIS-ISLEMLERI
+         ELSE
+            MOVE "5921"    TO WS-RESPONSE-CODE
+            STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+            DELIMITED BY SIZE
+            "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+            MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+            MOVE "09"      TO WS-RESPONSE-COUNTER
+            PERFORM HATA-VER-WORK
+       END-IF
+    END-IF
+  END-IF.
+
+           IF s-emanet-tutar-elekse  > 0
+   INITIALIZE D-HESPLAN, WS-FLAG6, WS-FLAG15
+     if s-acente-sicil-no = 999996
+     MOVE "393060001494"    TO GMU-HESAP-REF-NO OF D-HESPLAN ,
+                               ent-HESAP-REF-NO OF D-enteg
+     MOVE S-emanet-tutar-elekse TO ENT-TUTAR OF D-ENTEG
+      else
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+      end-if
+
+   PERFORM SELECT-HESAP-PLANI
+       MOVE 0              TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+       move 5 to ENT-ISLEM-TIPI OF D-ENTEG
+       PERFORM INSERT-ENTEGRS
+        IF IOSUBE-NO OF D-OZET = 99
+            SET WS-ACENTE-ROW-DEVAM-FLAG TO TRUE
+         END-IF
+       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+          PERFORM FIS-emanet-tutar
+       ELSE
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+    END-IF
+  END-IF
+
+    if   s-emanet-tutar-nkolay  > 0
+      INITIALIZE D-HESPLAN, WS-FLAG6, WS-FLAG15
+     if s-acente-sicil-no = 999997
+     MOVE "393060001493"    TO GMU-HESAP-REF-NO OF D-HESPLAN ,
+                               ent-HESAP-REF-NO OF D-enteg
+     MOVE S-emanet-tutar-nkolay TO ENT-TUTAR OF D-ENTEG
+      else
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+      end-if
+
+   PERFORM SELECT-HESAP-PLANI
+       MOVE 0              TO ENT-DOVIZ-MIKTARI  OF D-ENTEG
+       move 5 to ENT-ISLEM-TIPI OF D-ENTEG
+
+       PERFORM INSERT-ENTEGRS
+          IF IOSUBE-NO OF D-OZET = 99
+            SET WS-ACENTE-ROW-DEVAM-FLAG TO TRUE
+         END-IF
+       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+          PERFORM FIS-emanet-tutar
+       ELSE
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING ISLEM-TURU OF D-ISLEMTUR " ENTEGRASYON TABLOSUNA "
+          DELIMITED BY SIZE
+          "KAYIT EKLENEMEDÝ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "09"      TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+    END-IF
+  END-IF.
+ MFYS-ENTEGRASYON-EXIT.
+      EXIT.
+*****************************************************************************
+ SELECT-ISLEMTUR SECTION.
+
+  MOVE "=ISLEMTUR" TO WS-HATA-TABLE-NAME
+
+   EXEC SQL
+     SELECT ISLEM_ACIKLAMA,MUH_HES_REF_NO,MUH_HES_REF_NO1,
+            MUH_HES_REF_NO2,MUH_HES_REF_NO3,MUH_HES_REF_NO4,
+            MUH_HES_REF_NO5,MUH_HES_REF_NO6,MUH_HES_REF_NO7,
+            MUH_HES_REF_NO8,MUH_HES_REF_NO9,MUH_HES_REF_NO10,
+            MUH_HES_REF_NO11,MUH_HES_REF_NO12,
+            MUH_KOM_HES_REF_NO,KOMISYON,CARPAN,
+            ODEME_KODU,
+            ISLEM_ACIKLAMA1,ISLEM_ACIKLAMA2
+       INTO :ISLEM-ACIKLAMA      OF D-ISLEMTUR,
+            :MUH-HES-REF-NO      OF D-ISLEMTUR,
+            :MUH-HES-REF-NO1     OF D-ISLEMTUR,
+            :MUH-HES-REF-NO2     OF D-ISLEMTUR,
+            :MUH-HES-REF-NO3     OF D-ISLEMTUR,
+            :MUH-HES-REF-NO4     OF D-ISLEMTUR,
+            :MUH-HES-REF-NO5     OF D-ISLEMTUR,
+            :MUH-HES-REF-NO6     OF D-ISLEMTUR,
+            :MUH-HES-REF-NO7     OF D-ISLEMTUR,
+            :MUH-HES-REF-NO8     OF D-ISLEMTUR,
+            :MUH-HES-REF-NO9     OF D-ISLEMTUR,
+            :MUH-HES-REF-NO10    OF D-ISLEMTUR,
+            :MUH-HES-REF-NO11    OF D-ISLEMTUR,
+            :MUH-HES-REF-NO12    OF D-ISLEMTUR,
+            :MUH-KOM-HES-REF-NO  OF D-ISLEMTUR,
+            :KOMISYON            OF D-ISLEMTUR,
+            :CARPAN              OF D-ISLEMTUR,
+            :ODEME-KODU          OF D-ISLEMTUR,
+            :ISLEM-ACIKLAMA1     OF D-ISLEMTUR,
+            :ISLEM-ACIKLAMA2     OF D-ISLEMTUR
+      FROM $DATA18.muhtab.islemtur
+      WHERE ISLEM_TURU = :ISLEM-TURU OF D-ISLEMTUR  AND
+             PARA_TURU = :PARA-TURU  OF D-ISLEMTUR
+      BROWSE ACCESS
+   END-EXEC.
+   EVALUATE SQLCODE OF SQLCA
+   WHEN 0
+     CONTINUE
+   WHEN 100
+     DISPLAY "ISLEM-TURU : " ISLEM-TURU OF D-ISLEMTUR
+     DISPLAY "PARA-TURU : " PARA-TURU OF D-ISLEMTUR
+     PERFORM HATA-VER-WORK-100
+   WHEN OTHER
+     PERFORM HATA-VER-WORK-OTHER
+    END-EVALUATE.
+
+ SELECT-ISLEMTUR-EXIT.
+        EXIT.
+******************************************************************************
+ SELECT-BOLGE-KODU SECTION.
+
+ MOVE "=PTTMRK" TO WS-HATA-TABLE-NAME
+ MOVE IOMERKEZ-NO TO MERKEZ-NO OF D-PTTMRK
+
+  EXEC SQL
+    SELECT DISTINCT(BOLGE_KODU)
+      INTO :BOLGE-KODU OF D-PTTMRK
+      FROM =PTTMRK
+      WHERE MERKEZ_NO = :MERKEZ-NO OF D-PTTMRK
+    BROWSE ACCESS
+  END-EXEC.
+  EVALUATE SQLCODE OF SQLCA
+   WHEN 0
+     CONTINUE
+   WHEN 100
+     PERFORM HATA-VER-WORK-100
+   WHEN OTHER
+     PERFORM HATA-VER-WORK-OTHER
+   END-EVALUATE.
+
+ SELECT-BOLGE-KODU-EXIT.
+       EXIT.
+******************************************************************************
+ KONTROL-KONSINYE SECTION.
+
+ MOVE "=KRMURUN"  TO WS-HATA-TABLE-NAME
+ MOVE ENT-HESAP-REF-NO OF D-ENTEG TO MUH-HES-REF-NO OF D-ISLEMTUR
+
+  EXEC SQL
+    SELECT COUNT (*)
+      INTO :S-KONSINYE-KURUM-ADET
+      FROM =KRMURUN
+      WHERE CAST (KURUM_KODU AS CHAR(03)) IN (
+      SELECT SUBSTRING (ISLEM_TURU FROM 2 FOR 3) FROM
+      $data18.muhtab.islemtur
+      WHERE MUH_HES_REF_NO = :MUH-HES-REF-NO OF D-ISLEMTUR
+      BROWSE ACCESS)   AND
+      KURUM_KODU NOT IN (286,667,951,536,718,719 )
+    BROWSE ACCESS
+  END-EXEC.
+  EVALUATE SQLCODE OF SQLCA
+   WHEN 0
+     IF S-KONSINYE-KURUM-ADET > 0
+        SET WS-KONSINYE-FLAG TO TRUE
+     END-IF
+   WHEN 100
+     PERFORM HATA-VER-WORK-100
+   WHEN OTHER
+     PERFORM HATA-VER-WORK-OTHER
+   END-EVALUATE.
+
+ KONTROL-KONSINYE-EXIT.
+     EXIT.
+*******************************************************************************
+ SELECT-HESAP-PLANI SECTION.
+
+  MOVE "=HESPLANI"     TO WS-HATA-TABLE-NAME
+  MOVE WS-KURULUS-KODU TO GMU-KURULUS-KODU OF D-HESPLAN
+  INITIALIZE WS-FLAG15, ws-flag16
+
+  EXEC SQL
+    SELECT GMU_HESAP_ADI,GMU_ODEME_KODU,GMU_HESAP_OZELLIGI,gmu_kdv
+      INTO :GMU-HESAP-ADI      OF D-HESPLAN,
+           :GMU-ODEME-KODU     OF D-HESPLAN,
+           :GMU-HESAP-OZELLIGI OF D-HESPLAN,
+           :gmu-kdv of d-hesplan
+     FROM =HESPLANI
+     WHERE GMU_KURULUS_KODU = :GMU-KURULUS-KODU OF D-HESPLAN AND
+           GMU_HESAP_REF_NO = :GMU-HESAP-REF-NO OF D-HESPLAN
+     BROWSE ACCESS
+  END-EXEC.
+  EVALUATE SQLCODE OF SQLCA
+   WHEN 0
+     MOVE GMU-HESAP-ADI OF D-HESPLAN  TO ENT-HESAP-ADI   OF D-ENTEG
+**   MOVE GMU-ODEME-KODU OF D-HESPLAN TO ENT-DOVIZ-CINSI OF D-ENTEG
+     IF NOT (GMU-ODEME-KODU OF D-HESPLAN = "TRL" OR
+             GMU-ODEME-KODU OF D-HESPLAN = "TL " OR
+             GMU-ODEME-KODU OF D-HESPLAN = "YTL")
+        MOVE ODEME-KODU OF D-ISLEMTUR    TO ENT-DOVIZ-CINSI OF D-ENTEG
+     ELSE
+        MOVE GMU-ODEME-KODU OF D-HESPLAN TO ENT-DOVIZ-CINSI OF D-ENTEG
+     END-IF
+   IF GMU-HESAP-OZELLIGI OF D-HESPLAN = "B"
+       if gmu-kdv = "H"
+       SET WS-BSMV-FLAG  TO TRUE
+       end-if
+    END-IF
+
+   WHEN 100
+     display "-------------------------------------"
+     display " islem-turu : " islem-turu of d-islemtur
+     display "-------------------------------------"
+     DISPLAY " HESAP-REF-NO : " GMU-HESAP-REF-NO OF D-HESPLAN
+     PERFORM HATA-VER-WORK-100
+   WHEN OTHER
+     PERFORM HATA-VER-WORK-OTHER
+   END-EVALUATE.
+
+  exec sql
+  select gmu_dvs_durumu into :gmu-dvs-durumu of d-hesplan
+  from $data18.muhtab.hesplani
+  where gmu_hesap_ref_no = :GMU-HESAP-REF-NO OF D-HESPLAN
+  and gmu_dvs_durumu = "E" and gmu_hesap_durumu LIKE "%AKT%F%"
+  browse access
+  end-exec.
+  EVALUATE SQLCODE OF SQLCA
+  WHEN 0   set ws-dvs-flag to true
+  end-evaluate.
+
+
+ SELECT-HESAP-PLANI-EXIT.
+     EXIT.
+******************************************************************************
+ INSERT-ENTEGRS SECTION.
+
+  MOVE "=ENTEGRS" TO WS-HATA-TABLE-NAME
+
+*    IF IOISLEM-TURU OF D-OZET > "8000"
+*       IF CARPAN OF D-ISLEMTUR = 2
+*          MOVE 3 TO ENT-ISLEM-TIPI OF D-ENTEG
+*       ELSE
+*          IF CARPAN OF D-ISLEMTUR = 0
+*             MOVE 4 TO ENT-ISLEM-TIPI OF D-ENTEG
+*          END-IF
+*       END-IF
+*    ELSE
+       IF CARPAN OF D-ISLEMTUR = 2
+          IF IOSUBE-NO OF D-OZET = 99
+             MOVE 5 TO ENT-ISLEM-TIPI OF D-ENTEG
+          ELSE
+             MOVE 1 TO ENT-ISLEM-TIPI OF D-ENTEG
+          END-IF
+       ELSE
+          IF CARPAN OF D-ISLEMTUR = 0
+             IF IOSUBE-NO OF D-OZET = 99
+                MOVE 6 TO ENT-ISLEM-TIPI OF D-ENTEG
+             ELSE
+                MOVE 2 TO ENT-ISLEM-TIPI OF D-ENTEG
+             END-IF
+          END-IF
+       END-IF
+*    END-IF
+
+
+
+  IF NOT (GMU-ODEME-KODU OF D-HESPLAN = "TRL" OR
+          GMU-ODEME-KODU OF D-HESPLAN = "TL " OR
+          GMU-ODEME-KODU OF D-HESPLAN = "YTL")
+     MOVE PARA-KURU OF D-OZET TO ENT-DOVIZ-KURU  OF D-ENTEG
+  ELSE
+     MOVE 1 TO ENT-DOVIZ-KURU OF D-ENTEG
+  END-IF.
+
+  IF S-ONCEKI-MERKEZ-NO = ENT-MERKEZ-NO OF D-ENTEG AND
+       S-ONCEKI-SUBE-NO = ENT-SUBE-NO   OF D-ENTEG AND
+       S-ONCEKI-GISE-NO = ENT-GISE-NO   OF D-ENTEG
+       ADD 1 TO S-SIRA-NO
+  ELSE
+       MOVE 1 TO S-SIRA-NO
+  END-IF.
+
+  MOVE S-SIRA-NO TO ENT-SIRA-NO OF D-ENTEG
+
+  IF ENT-HESAP-REF-NO OF D-ENTEG = "106030000014" OR
+     ENT-HESAP-REF-NO OF D-ENTEG = "106030000016" OR
+     ENT-HESAP-REF-NO OF D-ENTEG = "106030000025" OR
+     ENT-HESAP-REF-NO OF D-ENTEG = "106030000026" OR
+     ENT-HESAP-REF-NO OF D-ENTEG = "106030000028" OR
+     ENT-HESAP-REF-NO OF D-ENTEG = "106030000030"
+     IF ENT-ISLEM-TIPI OF D-ENTEG = 1
+        MOVE 2 TO ENT-ISLEM-TIPI OF D-ENTEG
+     ELSE
+        IF ENT-ISLEM-TIPI OF D-ENTEG = 3
+           MOVE 4 TO ENT-ISLEM-TIPI OF D-ENTEG
+        ELSE
+           IF ENT-ISLEM-TIPI OF D-ENTEG = 2
+              MOVE 1 TO ENT-ISLEM-TIPI OF D-ENTEG
+           ELSE
+              IF ENT-ISLEM-TIPI OF D-ENTEG = 4
+                 MOVE 3 TO ENT-ISLEM-TIPI OF D-ENTEG
+              END-IF
+           END-IF
+        END-IF
+     END-IF
+  END-IF.
+
+   if ent-bolge-kodu of d-enteg = 200 and
+      ent-merkez-no of d-enteg = 50003 and
+      ent-sube-no of d-enteg = 99 and
+     ( S-ACENTE-SICIL-NO = 999997 or s-acente-sicil-no = 999996)   AND
+       ENT-HESAP-REF-NO OF D-ENTEG (1:1) = "6"
+          if S-ACENTE-SICIL-NO = 999997
+             compute s-emanet-tutar-nkolay rounded = ent-tutar of d-enteg -
+                                                ( ent-tutar of d-enteg * 0.45 )
+           end-if
+          if S-ACENTE-SICIL-NO = 999996
+             compute s-emanet-tutar-elekse rounded =
+                         ent-tutar of d-enteg - ( ent-tutar of d-enteg * 0.45 )
+           end-if
+           compute ent-tutar of d-enteg rounded  = ent-tutar of d-enteg * 0.45
+    end-if
+
+
+   EXEC SQL
+     INSERT INTO $DATA18.MUHTAB.ENTEGRS VALUES(
+       :ENT-SIRA-NO        OF D-ENTEG,
+       :ENT-ISLEM-YIL      OF D-ENTEG,
+       :ENT-ISLEM-AY       OF D-ENTEG,
+       :ENT-ISLEM-GUN      OF D-ENTEG,
+       :ENT-BOLGE-KODU     OF D-ENTEG,
+       :ENT-MERKEZ-NO      OF D-ENTEG,
+       :ENT-SUBE-NO        OF D-ENTEG,
+       :ENT-GISE-NO        OF D-ENTEG,
+       :ENT-HESAP-REF-NO   OF D-ENTEG,
+       :ENT-HESAP-ADI      OF D-ENTEG,
+       :ENT-TUTAR          OF D-ENTEG,
+       :ENT-ISLEM-TIPI     OF D-ENTEG,
+       :ENT-ISLEM-ADET     OF D-ENTEG,
+       :ENT-DOVIZ-CINSI    OF D-ENTEG,
+       :ENT-DOVIZ-MIKTARI  OF D-ENTEG,
+       :ENT-DOVIZ-KURU     OF D-ENTEG,
+       :ENT-SISTEM-YIL     OF D-ENTEG,
+       :ENT-SISTEM-AY      OF D-ENTEG,
+       :ENT-SISTEM-GUN     OF D-ENTEG,
+       :ENT-SISTEM-SAAT    OF D-ENTEG)
+   END-EXEC.
+   EVALUATE SQLCODE OF SQLCA
+   WHEN 0
+     CONTINUE
+   WHEN -8227
+     PERFORM HATA-VER-WORK-8227
+   WHEN OTHER
+     PERFORM HATA-VER-WORK-OTHER
+  END-EVALUATE.
+
+  MOVE IOMERKEZ-NO OF D-OZET TO S-ONCEKI-MERKEZ-NO
+  MOVE IOSUBE-NO   OF D-OZET TO S-ONCEKI-SUBE-NO
+  MOVE IOGISE-NO   OF D-OZET TO S-ONCEKI-GISE-NO.
+
+ INSERT-ENTEGRS-EXIT.
+     EXIT.
+******************************************************************************
+* INSERT-ENT-KONSINYE SECTION.
+*
+*  MOVE "=ENTKONSY" TO WS-HATA-TABLE-NAME
+*
+**    IF IOISLEM-TURU OF D-OZET > "8000"
+*
+*
+*
+*
+*
+*
+*
+*
+**       IF CARPAN OF D-ISLEMTUR = 2
+*
+*
+*
+**          MOVE 3 TO ENT-ISLEM-TIPI OF D-ENTEG
+*
+**       ELSE
+**          IF CARPAN OF D-ISLEMTUR = 0
+*
+*
+*
+**             MOVE 4 TO ENT-ISLEM-TIPI OF D-ENTEG
+*
+**          END-IF
+**       END-IF
+**    ELSE
+*       IF CARPAN OF D-ISLEMTUR = 2
+*          IF IOSUBE-NO OF D-OZET = 99
+*             MOVE 5 TO ENT-ISLEM-TIPI OF D-ENTEG
+*          ELSE
+*             MOVE 1 TO ENT-ISLEM-TIPI OF D-ENTEG
+*          END-IF
+*       ELSE
+*          IF CARPAN OF D-ISLEMTUR = 0
+*             IF IOSUBE-NO OF D-OZET = 99
+*                MOVE 6 TO ENT-ISLEM-TIPI OF D-ENTEG
+*             ELSE
+*                MOVE 2 TO ENT-ISLEM-TIPI OF D-ENTEG
+*             END-IF
+*          END-IF
+*       END-IF
+**    END-IF
+*
+*  IF NOT (GMU-ODEME-KODU OF D-HESPLAN = "TRL" OR
+*          GMU-ODEME-KODU OF D-HESPLAN = "TL " OR
+*          GMU-ODEME-KODU OF D-HESPLAN = "YTL")
+*     MOVE PARA-KURU OF D-OZET TO ENT-DOVIZ-KURU  OF D-ENTEG
+*  ELSE
+*     MOVE 1 TO ENT-DOVIZ-KURU OF D-ENTEG
+*  END-IF.
+*
+*  IF S-ONCEKI-MERKEZ-NO = ENT-MERKEZ-NO OF D-ENTEG AND
+*       S-ONCEKI-SUBE-NO = ENT-SUBE-NO   OF D-ENTEG AND
+*       S-ONCEKI-GISE-NO = ENT-GISE-NO   OF D-ENTEG
+*       ADD 1 TO S-SIRA-NO
+*  ELSE
+*       MOVE 1 TO S-SIRA-NO
+*  END-IF.
+*
+*  MOVE S-SIRA-NO TO ENT-SIRA-NO OF D-ENTEG
+*
+*  IF ENT-HESAP-REF-NO OF D-ENTEG = "106030000014" OR
+*     ENT-HESAP-REF-NO OF D-ENTEG = "106030000016" OR
+*     ENT-HESAP-REF-NO OF D-ENTEG = "106030000025" OR
+*     ENT-HESAP-REF-NO OF D-ENTEG = "106030000026" OR
+*     ENT-HESAP-REF-NO OF D-ENTEG = "106030000028" OR
+*     ENT-HESAP-REF-NO OF D-ENTEG = "106030000030"
+*     IF ENT-ISLEM-TIPI OF D-ENTEG = 1
+*        MOVE 2 TO ENT-ISLEM-TIPI OF D-ENTEG
+*     ELSE
+*        IF ENT-ISLEM-TIPI OF D-ENTEG = 3
+*           MOVE 4 TO ENT-ISLEM-TIPI OF D-ENTEG
+*        ELSE
+*           IF ENT-ISLEM-TIPI OF D-ENTEG = 2
+*              MOVE 1 TO ENT-ISLEM-TIPI OF D-ENTEG
+*           ELSE
+*              IF ENT-ISLEM-TIPI OF D-ENTEG = 4
+*                 MOVE 3 TO ENT-ISLEM-TIPI OF D-ENTEG
+*              END-IF
+*           END-IF
+*        END-IF
+*     END-IF
+*  END-IF.
+*
+*
+*   EXEC SQL
+*     INSERT INTO $DATA18.MUHTAB.ENTKONSY VALUES(
+*       :ENT-SIRA-NO        OF D-ENTEG,
+*       :ENT-ISLEM-YIL      OF D-ENTEG,
+*       :ENT-ISLEM-AY       OF D-ENTEG,
+*       :ENT-ISLEM-GUN      OF D-ENTEG,
+*       :ENT-BOLGE-KODU     OF D-ENTEG,
+*       :ENT-MERKEZ-NO      OF D-ENTEG,
+*       :ENT-SUBE-NO        OF D-ENTEG,
+*       :ENT-GISE-NO        OF D-ENTEG,
+*       :ENT-HESAP-REF-NO   OF D-ENTEG,
+*       :ENT-HESAP-ADI      OF D-ENTEG,
+*       :ENT-TUTAR          OF D-ENTEG,
+*       :ENT-ISLEM-TIPI     OF D-ENTEG,
+*       :ENT-ISLEM-ADET     OF D-ENTEG,
+*       :ENT-DOVIZ-CINSI    OF D-ENTEG,
+*       :ENT-DOVIZ-MIKTARI  OF D-ENTEG,
+*       :ENT-DOVIZ-KURU     OF D-ENTEG,
+*       :ENT-SISTEM-YIL     OF D-ENTEG,
+*       :ENT-SISTEM-AY      OF D-ENTEG,
+*       :ENT-SISTEM-GUN     OF D-ENTEG,
+*       :ENT-SISTEM-SAAT    OF D-ENTEG)
+*   END-EXEC.
+*   EVALUATE SQLCODE OF SQLCA
+*   WHEN 0
+*     CONTINUE
+*   WHEN -8227
+*     PERFORM HATA-VER-WORK-8227
+*   WHEN OTHER
+*     PERFORM HATA-VER-WORK-OTHER
+*  END-EVALUATE.
+*
+*  MOVE IOMERKEZ-NO OF D-OZET TO S-ONCEKI-MERKEZ-NO
+*  MOVE IOSUBE-NO   OF D-OZET TO S-ONCEKI-SUBE-NO
+*  MOVE IOGISE-NO   OF D-OZET TO S-ONCEKI-GISE-NO.
+*
+* INSERT-ENTEGRS-EXIT.
+*     EXIT.
+******************************************************************************
+ FIS-ISLEMLERI SECTION.
+
+  IF NOT (ENT-DOVIZ-CINSI OF D-ENTEG = "YTL" OR
+          ENT-DOVIZ-CINSI OF D-ENTEG = "TL " OR
+          ENT-DOVIZ-CINSI OF D-ENTEG = "TRL")
+     SET WS-DOVIZ-FLAG TO TRUE
+  ELSE
+     INITIALIZE WS-FLAG8
+  END-IF.
+
+*******************
+*1-TAHSILAT       *
+*2-TEDIYE         *
+*3-ATM TAHSILAT   *
+*4-ATM TEDIYE     *
+*******************
+
+  IF ENT-ISLEM-TIPI OF D-ENTEG = 1 OR ENT-ISLEM-TIPI OF D-ENTEG = 3 OR
+     ENT-ISLEM-TIPI OF D-ENTEG = 5
+*     IF WS-DOVIZ-FLAG
+*        PERFORM FIS-TAHSILAT-DOVIZ
+*     ELSE
+        IF IOSUBE-NO OF D-OZET NOT EQUAL 99
+           PERFORM FIS-TAHSILAT-NAKIT
+        ELSE
+           PERFORM FIS-TAHSILAT-NAKIT-ACENTE
+*        END-IF
+     END-IF
+  END-IF.
+
+  IF ENT-ISLEM-TIPI OF D-ENTEG = 2 OR ENT-ISLEM-TIPI OF D-ENTEG = 4 OR
+     ENT-ISLEM-TIPI OF D-ENTEG = 6
+*     IF WS-DOVIZ-FLAG
+*        PERFORM FIS-TEDIYE-DOVIZ
+*     ELSE
+        IF IOSUBE-NO OF D-OZET NOT EQUAL 99
+           PERFORM FIS-TEDIYE-NAKIT
+        ELSE
+           PERFORM FIS-TAHSILAT-NAKIT-ACENTE
+*        END-IF
+     END-IF
+  END-IF.
+
+
+ FIS-ISLEMLERI-EXIT.
+      EXIT.
+*******************************************************************************
+ fis-emanet-tutar SECTION.
+
+     IF NOT (ENT-DOVIZ-CINSI OF D-ENTEG = "YTL" OR
+          ENT-DOVIZ-CINSI OF D-ENTEG = "TL " OR
+          ENT-DOVIZ-CINSI OF D-ENTEG = "TRL")
+     SET WS-DOVIZ-FLAG TO TRUE
+  ELSE
+     INITIALIZE WS-FLAG8
+  END-IF.
+*******************
+*1-TAHSILAT       *
+*2-TEDIYE         *
+*3-ATM TAHSILAT   *
+*4-ATM TEDIYE     *
+*******************
+
+  IF ENT-ISLEM-TIPI OF D-ENTEG = 1 OR ENT-ISLEM-TIPI OF D-ENTEG = 3 OR
+     ENT-ISLEM-TIPI OF D-ENTEG = 5
+
+  MOVE "338"                     TO WS-FIS-TURU
+     MOVE WS-ACENTE-ALACAKLARI-REF  TO WS-HESAP-REF-NO
+   END-IF.
+
+
+*simdi entegrasyon tablosundaki hesap icin fisdetay ve ozethes tablolarina
+*kayit insert/update ediliyor.
+
+     MOVE ENT-HESAP-REF-NO   OF D-ENTEG TO WS-HESAP-REF-NO
+     MOVE 0                             TO WS-BORC-TUTAR
+     MOVE ENT-TUTAR          OF D-ENTEG TO WS-ALACAK-TUTAR
+     MOVE ENT-DOVIZ-MIKTARI  OF D-ENTEG TO WS-DOVIZ-MIKTAR
+     MOVE ENT-DOVIZ-KURU     OF D-ENTEG TO WS-DOVIZ-KURU
+     MOVE ENT-DOVIZ-CINSI    OF D-ENTEG TO WS-ODEME-KODU
+
+     INITIALIZE D-HESPLAN, WS-DGT-KODU
+
+     PERFORM E10-HESPLANI-KONTROL
+     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+        PERFORM E20-KDV-KONTROL
+     END-IF
+     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+        PERFORM E30-FIS-ISLEMLERI-DEVAM
+     END-IF.
+
+
+
+
+    fis-emanet-tutar-EXIT.
+      EXIT.
+
+
+****************************************************************************
+ FIS-TAHSILAT-NAKIT SECTION.
+
+     IF ENT-ISLEM-TIPI OF D-ENTEG = 1
+        MOVE "110"                         TO WS-FIS-TURU
+        MOVE GMU-NAKIT-KASA-REF OF D-PARAM TO WS-HESAP-REF-NO
+        MOVE WS-GISE-FIS-ACIKLAMA          TO WS-FIS-ACIKLAMA
+     ELSE
+        IF ENT-ISLEM-TIPI OF D-ENTEG = 3
+           MOVE "113"               TO WS-FIS-TURU
+           MOVE S-ATM-TAHSIL-HESAP  TO WS-HESAP-REF-NO
+           MOVE WS-ATM-FIS-ACIKLAMA TO WS-FIS-ACIKLAMA
+        ELSE
+           IF ENT-ISLEM-TIPI OF D-ENTEG = 5
+              if s-acente-sicil-no = 777777 or    s-acente-sicil-no = 777776
+              move "330"                     to ws-fis-turu
+              else
+              MOVE "338"                     TO WS-FIS-TURU
+              end-if
+              MOVE WS-ACENTE-ALACAKLARI-REF  TO WS-HESAP-REF-NO
+*             MOVE WS-ACENTE-FIS-ACIKLAMA    TO WS-FIS-ACIKLAMA
+           END-IF
+        END-IF
+     END-IF.
+
+   IF ENT-ISLEM-TIPI OF D-ENTEG = 5
+      PERFORM ACENTE-YARDIMCI-KART-BUL
+   END-IF.
+
+
+   PERFORM C-SIRA-NO-AL
+   IF OK-MSG = 0 AND OK-MSG-ENT = 0
+      PERFORM D-FIS-BASLIK
+   END-IF.
+
+ INITIALIZE WS-TOPLAM-BORC-TUTAR,  WS-TOPLAM-ALACAK-TUTAR
+
+*once parametre tablosundan select edilen hesap icin fisdetay ve ozethes
+*tablolarina kayit insert/update ediliyor.
+
+     MOVE ENT-TUTAR          OF D-ENTEG TO WS-BORC-TUTAR
+     MOVE 0                             TO WS-ALACAK-TUTAR
+     MOVE ENT-DOVIZ-MIKTARI  OF D-ENTEG TO WS-DOVIZ-MIKTAR
+     MOVE ENT-DOVIZ-KURU     OF D-ENTEG TO WS-DOVIZ-KURU
+     MOVE ENT-DOVIZ-CINSI    OF D-ENTEG TO WS-ODEME-KODU
+
+     INITIALIZE D-HESPLAN, WS-DGT-KODU
+
+     PERFORM E10-HESPLANI-KONTROL
+     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+        PERFORM E20-KDV-KONTROL
+     END-IF
+     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+        PERFORM E30-FIS-ISLEMLERI-DEVAM
+     END-IF.
+
+*simdi entegrasyon tablosundaki hesap icin fisdetay ve ozethes tablolarina
+*kayit insert/update ediliyor.
+
+     MOVE ENT-HESAP-REF-NO   OF D-ENTEG TO WS-HESAP-REF-NO
+     MOVE 0                             TO WS-BORC-TUTAR
+     MOVE ENT-TUTAR          OF D-ENTEG TO WS-ALACAK-TUTAR
+     MOVE ENT-DOVIZ-MIKTARI  OF D-ENTEG TO WS-DOVIZ-MIKTAR
+     MOVE ENT-DOVIZ-KURU     OF D-ENTEG TO WS-DOVIZ-KURU
+     MOVE ENT-DOVIZ-CINSI    OF D-ENTEG TO WS-ODEME-KODU
+
+     INITIALIZE D-HESPLAN, WS-DGT-KODU
+
+     PERFORM E10-HESPLANI-KONTROL
+     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+        PERFORM E20-KDV-KONTROL
+     END-IF
+     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+        PERFORM E30-FIS-ISLEMLERI-DEVAM
+     END-IF.
+
+*simdi de eger entegrasyonu yapilan hesap kdv'li bir hesapsa
+*kdv tutari icin bir kayit olusturuluyor.
+
+  IF WS-KDV-VAR-FLAG AND WS-KDV-TUTAR > 0
+
+     MOVE GMU-KDV-HESAP-REF-NO OF D-HESPLAN TO WS-HESAP-REF-NO
+     MOVE 0                                 TO WS-BORC-TUTAR
+     MOVE WS-KDV-TUTAR                      TO WS-ALACAK-TUTAR
+     MOVE ENT-DOVIZ-MIKTARI    OF D-ENTEG   TO WS-DOVIZ-MIKTAR
+     MOVE ENT-DOVIZ-KURU       OF D-ENTEG   TO WS-DOVIZ-KURU
+     MOVE ENT-DOVIZ-CINSI    OF D-ENTEG TO WS-ODEME-KODU
+
+     INITIALIZE D-HESPLAN, WS-DGT-KODU
+
+     PERFORM E10-HESPLANI-KONTROL
+     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+        PERFORM E30-FIS-ISLEMLERI-DEVAM
+     END-IF
+   END-IF.
+   IF WS-TOPLAM-BORC-TUTAR NOT EQUAL WS-TOPLAM-ALACAK-TUTAR
+      DISPLAY "FÝÞÝN TOPLAM BORÇ TUTARI VE TOPLAM ALACAK TUTARI EÞÝT OLMALI!"
+      PERFORM HATA-VER-WORK
+   END-IF.
+
+   IF WS-KDV-HARIC-FLAG
+      PERFORM FIS-MAHSUP-BSMV
+   END-IF.
+
+ FIS-TAHSILAT-NAKIT-EXIT.
+      EXIT.
+*******************************************************************************
+ FIS-TAHSILAT-NAKIT-ACENTE SECTION.
+
+*    IF WS-YENI-SUBE-FLAG AND WS-ILKMI NOT EQUAL 1
+*       MOVE WS-TOPLAM-ALACAK-TUTAR        TO WS-BORC-TUTAR
+*       MOVE 0                             TO WS-ALACAK-TUTAR
+*       MOVE ENT-DOVIZ-MIKTARI  OF D-ENTEG TO WS-DOVIZ-MIKTAR
+*       MOVE ENT-DOVIZ-KURU     OF D-ENTEG TO WS-DOVIZ-KURU
+*
+*       INITIALIZE D-HESPLAN, WS-DGT-KODU
+
+*       PERFORM E10-HESPLANI-KONTROL
+*       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+*          PERFORM E20-KDV-KONTROL
+*       END-IF
+*       IF OK-MSG = 0 AND OK-MSG-ENT = 0
+*          PERFORM E30-FIS-ISLEMLERI-DEVAM
+*       END-IF
+*
+*     IF WS-TOPLAM-BORC-TUTAR NOT EQUAL WS-TOPLAM-ALACAK-TUTAR
+*        DISPLAY "FÝÞÝN TOPLAM BORÇ TUTARI VE TOPLAM ALACAK TUTARI EÞÝT OLMALI!"
+*        PERFORM HATA-VER-WORK
+*     END-IF
+*  END-IF.
+
+
+  IF ENT-ISLEM-TIPI OF D-ENTEG = 5 OR ENT-ISLEM-TIPI OF D-ENTEG = 6
+     MOVE "338"                     TO WS-FIS-TURU
+         INITIALIZE WS-FIS-ACIKLAMA
+          if ent-merkez-no of d-enteg = 50003
+            if S-ACENTE-SICIL-NO = 999997
+            STRING "POSTANET N-KOLAY  ACENTELIGI ENTEGRASYONU (OTOMATIK)-"
+                 DELIMITED BY SIZE
+                 S-ACENTE-SICIL-NO DELIMITED BY SIZE INTO WS-FIS-ACIKLAMA
+           end-if
+            IF S-ACENTE-SICIL-NO = 888889
+              STRING "PTTEM SANAL ACENTELIK ENTEGRASYONU (OTOMATIK)-"
+              DELIMITED BY SIZE
+              S-ACENTE-SICIL-NO DELIMITED BY SIZE INTO WS-FIS-ACIKLAMA
+            end-if
+             IF S-ACENTE-SICIL-NO = 999996
+              STRING "ELEKSE TAHSILAT ACENTELIK ENTEGRASYONU (OTOMATIK)-"
+              DELIMITED BY SIZE
+              S-ACENTE-SICIL-NO DELIMITED BY SIZE INTO WS-FIS-ACIKLAMA
+            end-if
+         if S-ACENTE-SICIL-NO = 777777
+        STRING "E-PLATFORM SANAL POS ENTEGRASYONU (OTOMATIK)-"
+               DELIMITED BY SIZE
+                S-ACENTE-SICIL-NO DELIMITED BY SIZE INTO WS-FIS-ACIKLAMA
+          MOVE "330"                     TO WS-FIS-TURU
+         end-if
+
+
+*         if S-ACENTE-SICIL-NO = 777776
+*        STRING "E-DEVLET HGS BAKIYE YUKLEME ENTEGRASYONU-OTOMATIK)-"
+*               DELIMITED BY SIZE
+*                S-ACENTE-SICIL-NO DELIMITED BY SIZE INTO WS-FIS-ACIKLAMA
+*          MOVE "330"                     TO WS-FIS-TURU
+*         end-if
+
+*         if S-ACENTE-SICIL-NO = 999998 and IOISLEM-TURU  OF D-OZET = "3951"
+*        STRING "MOBIL BANKACILIK KANALI ILE HGS YUKLEME -OTOMATIK)-"
+*               DELIMITED BY SIZE
+*                S-ACENTE-SICIL-NO DELIMITED BY SIZE INTO WS-FIS-ACIKLAMA
+*          MOVE "330"                     TO WS-FIS-TURU
+*         end-if
+
+        END-IF
+
+                   if ent-merkez-no of d-enteg = 50928
+                   AND S-ACENTE-SICIL-NO = 999998 and IOISLEM-TURU  OF D-OZET = "3951"
+        STRING "MOBIL BANKACILIK KANALI ILE HGS YUKLEME -OTOMATIK)-"
+               DELIMITED BY SIZE
+                S-ACENTE-SICIL-NO DELIMITED BY SIZE INTO WS-FIS-ACIKLAMA
+          MOVE "330"                     TO WS-FIS-TURU
+         end-if
+
+                     if ent-merkez-no of d-enteg = 50928
+                        and S-ACENTE-SICIL-NO = 777776
+        STRING "E-DEVLET HGS BAKIYE YUKLEME ENTEGRASYONU-OTOMATIK)-"
+               DELIMITED BY SIZE
+                S-ACENTE-SICIL-NO DELIMITED BY SIZE INTO WS-FIS-ACIKLAMA
+          MOVE "330"                     TO WS-FIS-TURU
+         end-if
+         if ent-merkez-no of d-enteg < 40000
+*         if s-acente-sicil-no (1:4) equal 3000
+     if s-acente-sicil-no > 30000000 and s-acente-sicil-no < 32000000
+           STRING "N-KOLAY KPAPG ACENTE ENTEGRASYONU (OTOMATIK)-"
+           DELIMITED BY SIZE
+           S-ACENTE-SICIL-NO DELIMITED BY SIZE INTO WS-FIS-ACIKLAMA
+          else
+       if s-acente-sicil-no > 32000000 and s-acente-sicil-no < 33000000
+           STRING "ELEKSE KPAPG ACENTE ENTEGRASYONU (OTOMATIK)-"
+           DELIMITED BY SIZE
+           S-ACENTE-SICIL-NO DELIMITED BY SIZE INTO WS-FIS-ACIKLAMA
+          else
+          if s-acente-sicil-no (1:4) equal 4000
+           STRING "ATEK  KPAPG ACENTE ENTEGRASYONU (OTOMATIK)-"
+           DELIMITED BY SIZE
+           S-ACENTE-SICIL-NO DELIMITED BY SIZE INTO WS-FIS-ACIKLAMA
+          else
+           STRING "POSTANET ACENTE ENTEGRASYONU (OTOMATIK)-"
+           DELIMITED BY SIZE
+           S-ACENTE-SICIL-NO DELIMITED BY SIZE INTO WS-FIS-ACIKLAMA
+         end-if
+         end-if
+         end-if
+        end-if
+          if ent-merkez-no of d-enteg > 40000 and
+              ent-merkez-no of d-enteg < 41000
+              STRING "POSTANET TAHSILAT ACENTELIGI ENTEGRASYONU (OTOMATIK)-"
+              DELIMITED BY SIZE
+              S-ACENTE-SICIL-NO DELIMITED BY SIZE INTO WS-FIS-ACIKLAMA
+         end-if
+
+
+  ELSE
+     GO TO FIS-TAHSILAT-NAKIT-ACENTE-EXIT
+  END-IF.
+
+
+         if s-acente-sicil-no not equal 777777 OR
+       s-acente-sicil-no not equal 777776 or
+       s-acente-sicil-no not equal 999998
+  PERFORM ACENTE-YARDIMCI-KART-BUL
+  end-if
+
+  IF S-ACENTE-SICIL-NO  NOT EQUAL S-ONCEKI-ACENTE-SICIL-NO OR
+     WS-ILKMI = 1
+     IF NOT WS-ACENTE-ROW-DEVAM-FLAG
+        INITIALIZE WS-TOPLAM-BORC-TUTAR,  WS-TOPLAM-ALACAK-TUTAR
+        PERFORM C-SIRA-NO-AL
+        IF OK-MSG = 0 AND OK-MSG-ENT = 0
+           PERFORM D-FIS-BASLIK
+        END-IF
+     END-IF
+  END-IF.
+
+*once entegrasyon tablosundaki hesap icin fisdetay ve ozethes tablolarina
+*kayit insert/update ediliyor.
+
+  MOVE ENT-HESAP-REF-NO   OF D-ENTEG TO WS-HESAP-REF-NO
+  IF ENT-ISLEM-TIPI OF D-ENTEG = 5
+     MOVE 0                             TO WS-BORC-TUTAR
+     MOVE ENT-TUTAR          OF D-ENTEG TO WS-ALACAK-TUTAR
+  ELSE
+     IF ENT-ISLEM-TIPI OF D-ENTEG = 6
+        MOVE ENT-TUTAR          OF D-ENTEG TO WS-BORC-TUTAR
+        MOVE 0                             TO WS-ALACAK-TUTAR
+     END-IF
+  END-IF
+  MOVE ENT-DOVIZ-MIKTARI  OF D-ENTEG TO WS-DOVIZ-MIKTAR
+  MOVE ENT-DOVIZ-KURU     OF D-ENTEG TO WS-DOVIZ-KURU
+  MOVE ENT-DOVIZ-CINSI    OF D-ENTEG TO WS-ODEME-KODU
+
+
+
+     INITIALIZE D-HESPLAN, WS-DGT-KODU
+
+     PERFORM E10-HESPLANI-KONTROL
+     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+        PERFORM E20-KDV-KONTROL
+     END-IF.
+     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+         PERFORM E30-FIS-ISLEMLERI-DEVAM
+     END-IF.
+
+*simdi de eger entegrasyonu yapilan hesap kdv'li bir hesapsa
+*kdv tutari icin bir kayit olusturuluyor.
+
+  IF WS-KDV-VAR-FLAG AND WS-KDV-TUTAR > 0
+
+     MOVE GMU-KDV-HESAP-REF-NO OF D-HESPLAN TO WS-HESAP-REF-NO
+     MOVE 0                                 TO WS-BORC-TUTAR
+     MOVE WS-KDV-TUTAR                      TO WS-ALACAK-TUTAR
+     MOVE ENT-DOVIZ-MIKTARI    OF D-ENTEG   TO WS-DOVIZ-MIKTAR
+     MOVE ENT-DOVIZ-KURU       OF D-ENTEG   TO WS-DOVIZ-KURU
+     MOVE ENT-DOVIZ-CINSI      OF D-ENTEG   TO WS-ODEME-KODU
+
+     INITIALIZE D-HESPLAN, WS-DGT-KODU
+
+     PERFORM E10-HESPLANI-KONTROL
+     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+        PERFORM E30-FIS-ISLEMLERI-DEVAM
+     END-IF
+   END-IF.
+
+*bsmv'li bir hesap varsa onun icin mahsup fisine 360 ve 740'li hesaplar
+*icin bsmv orani kadar tutar icin iki detay kaydi ekleniyor.
+
+   IF WS-KDV-HARIC-FLAG
+      COMPUTE ENT-TUTAR OF D-ENTEG  rounded =  ENT-TUTAR OF D-ENTEG *
+                                               GMU-KDV-ORAN OF D-HESPLAN / 100
+*once 740'li hesap icin fis detayi ekleniyor.
+      MOVE S-BSMV-HESAP-740              TO WS-HESAP-REF-NO
+      MOVE ENT-TUTAR          OF D-ENTEG TO WS-BORC-TUTAR
+      MOVE 0                             TO WS-ALACAK-TUTAR
+      MOVE ENT-DOVIZ-MIKTARI  OF D-ENTEG TO WS-DOVIZ-MIKTAR
+      MOVE ENT-DOVIZ-KURU     OF D-ENTEG TO WS-DOVIZ-KURU
+      MOVE ENT-DOVIZ-CINSI    OF D-ENTEG TO WS-ODEME-KODU
+      INITIALIZE D-HESPLAN, WS-DGT-KODU
+      PERFORM E10-HESPLANI-KONTROL
+      IF OK-MSG = 0 AND OK-MSG-ENT = 0
+         PERFORM E30-FIS-ISLEMLERI-DEVAM
+      END-IF
+
+*simdi de 360'li hesap icin fis detayi ekleniyor.
+
+     MOVE S-BSMV-HESAP-360              TO WS-HESAP-REF-NO
+     MOVE 0                             TO WS-BORC-TUTAR
+     MOVE ENT-TUTAR          OF D-ENTEG TO WS-ALACAK-TUTAR
+     MOVE ENT-DOVIZ-MIKTARI  OF D-ENTEG TO WS-DOVIZ-MIKTAR
+     MOVE ENT-DOVIZ-KURU     OF D-ENTEG TO WS-DOVIZ-KURU
+     MOVE ENT-DOVIZ-CINSI    OF D-ENTEG TO WS-ODEME-KODU
+
+     INITIALIZE D-HESPLAN, WS-DGT-KODU
+
+      PERFORM E10-HESPLANI-KONTROL
+      IF OK-MSG = 0 AND OK-MSG-ENT = 0
+         PERFORM E30-FIS-ISLEMLERI-DEVAM
+      END-IF
+   END-IF.
+
+ FIS-TAHSILAT-NAKIT-ACENTE-EXIT.
+      EXIT.
+*******************************************************************************
+ FIS-MAHSUP-BSMV SECTION.
+
+   MOVE S-BSMV-HESAP-740              TO WS-HESAP-REF-NO
+   IF IOSUBE-NO OF D-OZET EQUAL 99
+     INITIALIZE WS-FIS-ACIKLAMA
+     if ent-merkez-no of d-enteg < 40000
+*      if s-acente-sicil-no (1:4) equal 3000
+      if s-acente-sicil-no > 30000000 and s-acente-sicil-no < 32000000
+       STRING "N-KOLAY KPAPG ACENTE ENTEGRASYONU (OTOMATIK)-"
+        DELIMITED BY SIZE
+        S-ACENTE-SICIL-NO DELIMITED BY SIZE INTO WS-FIS-ACIKLAMA
+       else
+      if s-acente-sicil-no > 32000000 and s-acente-sicil-no < 33000000
+       STRING "ELEKSE KPAPG ACENTE ENTEGRASYONU (OTOMATIK)-"
+        DELIMITED BY SIZE
+        S-ACENTE-SICIL-NO DELIMITED BY SIZE INTO WS-FIS-ACIKLAMA
+       else
+       if s-acente-sicil-no (1:4) equal 4000
+        STRING "ATEK  KPAPG ACENTE ENTEGRASYONU (OTOMATIK)-"
+        DELIMITED BY SIZE
+        S-ACENTE-SICIL-NO DELIMITED BY SIZE INTO WS-FIS-ACIKLAMA
+       else
+         STRING "POSTANET ACENTE ENTEGRASYONU (OTOMATIK)-"
+         DELIMITED BY SIZE
+         S-ACENTE-SICIL-NO DELIMITED BY SIZE INTO WS-FIS-ACIKLAMA
+       end-if
+       end-if
+       end-if
+      else
+        STRING "POSTANET TAHSILAT ACENTELIGI ENTEGRASYONU (OTOMATIK)-"
+        DELIMITED BY SIZE
+        S-ACENTE-SICIL-NO DELIMITED BY SIZE INTO WS-FIS-ACIKLAMA
+      end-if
+      if s-acente-sicil-no = 777777 OR s-acente-sicil-no = 777776
+                OR s-acente-sicil-no = 999998
+      move "330"                      to ws-fis-turu
+      else
+      MOVE "338"                      TO WS-FIS-TURU
+      end-if
+   ELSE
+      MOVE WS-GISE-FIS-ACIKLAMA          TO WS-FIS-ACIKLAMA
+      MOVE "330"                         TO WS-FIS-TURU
+   END-IF
+   COMPUTE ENT-TUTAR OF D-ENTEG  rounded =  ENT-TUTAR OF D-ENTEG *
+                                            GMU-KDV-ORAN OF D-HESPLAN / 100
+   PERFORM C-SIRA-NO-AL
+   IF OK-MSG = 0 AND OK-MSG-ENT = 0
+      PERFORM D-FIS-BASLIK
+   END-IF.
+
+ INITIALIZE WS-TOPLAM-BORC-TUTAR,  WS-TOPLAM-ALACAK-TUTAR
+
+*once parametre tablosundan select edilen hesap icin fisdetay ve ozethes
+*tablolarina kayit insert/update ediliyor.
+
+     MOVE ENT-TUTAR          OF D-ENTEG TO WS-BORC-TUTAR
+     MOVE 0                             TO WS-ALACAK-TUTAR
+     MOVE ENT-DOVIZ-MIKTARI  OF D-ENTEG TO WS-DOVIZ-MIKTAR
+     MOVE ENT-DOVIZ-KURU     OF D-ENTEG TO WS-DOVIZ-KURU
+     MOVE ENT-DOVIZ-CINSI    OF D-ENTEG TO WS-ODEME-KODU
+
+     INITIALIZE D-HESPLAN, WS-DGT-KODU
+
+     PERFORM E10-HESPLANI-KONTROL
+     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+        PERFORM E20-KDV-KONTROL
+     END-IF
+     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+        PERFORM E30-FIS-ISLEMLERI-DEVAM
+     END-IF.
+
+*simdi entegrasyon tablosundaki hesap icin fisdetay ve ozethes tablolarina
+*kayit insert/update ediliyor.
+
+     MOVE S-BSMV-HESAP-360              TO WS-HESAP-REF-NO
+     MOVE 0                             TO WS-BORC-TUTAR
+     MOVE ENT-TUTAR          OF D-ENTEG TO WS-ALACAK-TUTAR
+     MOVE ENT-DOVIZ-MIKTARI  OF D-ENTEG TO WS-DOVIZ-MIKTAR
+     MOVE ENT-DOVIZ-KURU     OF D-ENTEG TO WS-DOVIZ-KURU
+     MOVE ENT-DOVIZ-CINSI    OF D-ENTEG TO WS-ODEME-KODU
+
+     INITIALIZE D-HESPLAN, WS-DGT-KODU
+
+      PERFORM E10-HESPLANI-KONTROL
+      IF OK-MSG = 0 AND OK-MSG-ENT = 0
+         PERFORM E20-KDV-KONTROL
+      END-IF
+      IF OK-MSG = 0 AND OK-MSG-ENT = 0
+         PERFORM E30-FIS-ISLEMLERI-DEVAM
+      END-IF.
+
+*simdi de eger entegrasyonu yapilan hesap kdv'li bir hesapsa
+*kdv tutari icin bir kayit olusturuluyor.
+
+   IF WS-KDV-VAR-FLAG AND WS-KDV-TUTAR > 0
+
+      MOVE GMU-KDV-HESAP-REF-NO OF D-HESPLAN TO WS-HESAP-REF-NO
+      MOVE 0                                 TO WS-BORC-TUTAR
+      MOVE WS-KDV-TUTAR                      TO WS-ALACAK-TUTAR
+      MOVE ENT-DOVIZ-MIKTARI    OF D-ENTEG   TO WS-DOVIZ-MIKTAR
+      MOVE ENT-DOVIZ-KURU       OF D-ENTEG   TO WS-DOVIZ-KURU
+      MOVE ENT-DOVIZ-CINSI      OF D-ENTEG   TO WS-ODEME-KODU
+
+      INITIALIZE D-HESPLAN, WS-DGT-KODU
+
+      PERFORM E10-HESPLANI-KONTROL
+      IF OK-MSG = 0 AND OK-MSG-ENT = 0
+         PERFORM E30-FIS-ISLEMLERI-DEVAM
+      END-IF
+   END-IF.
+   IF WS-TOPLAM-BORC-TUTAR NOT EQUAL WS-TOPLAM-ALACAK-TUTAR
+      DISPLAY "FÝÞÝN TOPLAM BORÇ TUTARI VE TOPLAM ALACAK TUTARI EÞÝT OLMALI!"
+      PERFORM HATA-VER-WORK
+   END-IF.
+
+ FIS-MAHSUP-BSMV-EXIT.
+      EXIT.
+
+*******************************************************************************
+ ACENTE-FIS-KAPA SECTION.
+
+  IF WS-TOPLAM-BORC-TUTAR EQUAL WS-TOPLAM-ALACAK-TUTAR
+     GO TO ACENTE-FIS-KAPA-EXIT
+  END-IF
+
+
+   if S-ACENTE-SICIL-NO not equal 777777 OR
+      S-ACENTE-SICIL-NO not equal 777776 or
+      S-ACENTE-SICIL-NO not equal 999998
+      PERFORM ACENTE-YARDIMCI-KART-BUL
+   end-if
+
+**IF WS-YENI-SUBE-FLAG AND WS-ILKMI NOT EQUAL 1
+ IF WS-YENI-SUBE-FLAG
+    IF IOMERKEZ-NO OF D-OZET = 50003
+         OR IOMERKEZ-NO OF D-OZET = 50928
+      IF WS-TOPLAM-BORC-TUTAR > WS-TOPLAM-ALACAK-TUTAR
+        COMPUTE WS-ALACAK-TUTAR = WS-TOPLAM-BORC-TUTAR - WS-TOPLAM-ALACAK-TUTAR
+        MOVE 0 TO WS-BORC-TUTAR
+     IF S-ONCEKI-ACENTE-SICIL-NO EQUAL 999997
+        MOVE "320050000167"              TO WS-HESAP-REF-NO
+     END-IF
+     IF S-ONCEKI-ACENTE-SICIL-NO EQUAL 999996
+     MOVE "320050000257"              TO WS-HESAP-REF-NO
+     END-IF
+      ELSE
+        COMPUTE WS-BORC-TUTAR = WS-TOPLAM-ALACAK-TUTAR - WS-TOPLAM-BORC-TUTAR
+        MOVE 0 TO WS-ALACAK-TUTAR
+         if S-ONCEKI-ACENTE-SICIL-NO EQUAL 999998
+           MOVE "108050000030"              TO WS-HESAP-REF-NO
+        else
+        MOVE WS-ACENTE-ALACAKLARI-REF  TO WS-HESAP-REF-NO
+        end-if
+      END-IF
+    END-IF
+
+      IF IOMERKEZ-NO OF D-OZET NOT EQUAL 50003
+*         if S-ACENTE-SICIL-NO(1:4) equal 3000
+ if s-onceki-acente-sicil-no > 30000000 and s-onceki-acente-sicil-no < 32000000
+              IF WS-TOPLAM-BORC-TUTAR > WS-TOPLAM-ALACAK-TUTAR
+               COMPUTE WS-ALACAK-TUTAR = WS-TOPLAM-BORC-TUTAR - WS-TOPLAM-ALACAK-TUTAR
+               MOVE 0            TO WS-BORC-TUTAR
+               MOVE "320050000225" TO WS-HESAP-REF-NO
+               ELSE
+               COMPUTE WS-BORC-TUTAR = WS-TOPLAM-ALACAK-TUTAR - WS-TOPLAM-BORC-TUTAR
+               MOVE 0 TO WS-ALACAK-TUTAR
+               MOVE WS-ACENTE-ALACAKLARI-REF5 TO WS-HESAP-REF-NO
+               END-IF
+            else
+ if s-onceki-acente-sicil-no > 32000000 and s-onceki-acente-sicil-no < 33000000
+              IF WS-TOPLAM-BORC-TUTAR > WS-TOPLAM-ALACAK-TUTAR
+               COMPUTE WS-ALACAK-TUTAR = WS-TOPLAM-BORC-TUTAR - WS-TOPLAM-ALACAK-TUTAR
+               MOVE 0            TO WS-BORC-TUTAR
+               MOVE "320050000256" TO WS-HESAP-REF-NO
+               ELSE
+               COMPUTE WS-BORC-TUTAR = WS-TOPLAM-ALACAK-TUTAR - WS-TOPLAM-BORC-TUTAR
+               MOVE 0 TO WS-ALACAK-TUTAR
+               MOVE WS-ACENTE-ALACAKLARI-REF9  TO WS-HESAP-REF-NO
+               END-IF
+          else
+     MOVE WS-ACENTE-ALACAKLARI-REF1 TO WS-HESAP-REF-NO
+                     if S-ONCEKI-ACENTE-SICIL-NO EQUAL 777776 OR  S-ONCEKI-ACENTE-SICIL-NO EQUAL 999998
+       MOVE WS-ACENTE-ALACAKLARI-REF  TO WS-HESAP-REF-NO
+         end-if
+     IF WS-TOPLAM-BORC-TUTAR > WS-TOPLAM-ALACAK-TUTAR
+        COMPUTE WS-ALACAK-TUTAR = WS-TOPLAM-BORC-TUTAR - WS-TOPLAM-ALACAK-TUTAR
+        MOVE 0 TO WS-BORC-TUTAR
+     ELSE
+        COMPUTE WS-BORC-TUTAR = WS-TOPLAM-ALACAK-TUTAR - WS-TOPLAM-BORC-TUTAR
+        MOVE 0 TO WS-ALACAK-TUTAR
+     END-IF
+     END-IF
+ end-if
+ end-if
+     MOVE "TRL"                         TO WS-ODEME-KODU
+     MOVE ENT-DOVIZ-MIKTARI  OF D-ENTEG TO WS-DOVIZ-MIKTAR
+*    MOVE ENT-DOVIZ-KURU     OF D-ENTEG TO WS-DOVIZ-KURU
+     MOVE 1                             TO WS-DOVIZ-KURU
+
+     INITIALIZE D-HESPLAN, WS-DGT-KODU
+
+     PERFORM E10-HESPLANI-KONTROL
+     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+        PERFORM E20-KDV-KONTROL
+     END-IF
+     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+        PERFORM E30-FIS-ISLEMLERI-DEVAM
+     END-IF
+
+*    IF OK-MSG = 0
+*      PERFORM ACENTE-FIS-BUL
+*    END-IF
+     IF WS-TOPLAM-BORC-TUTAR NOT EQUAL WS-TOPLAM-ALACAK-TUTAR
+        DISPLAY "FÝÞÝN TOPLAM BORÇ TUTARI VE TOPLAM ALACAK TUTARI EÞÝT OLMALI!"
+        PERFORM HATA-VER-WORK
+     END-IF
+   END-IF.
+
+
+ ACENTE-FIS-KAPA-EXIT.
+        EXIT.
+******************************************************************************
+* ACENTE-FIS-BUL SECTION.
+
+
+*
+*
+*      CALL "SACENTE" USING  WS-KURULUS-KODU,
+*                           WS-ENTEG-BOLGE-KODU(K-SAY), IOMERKEZ-NO OF D-OZET,
+*                            WS-SFISDET-SUBE-NO, WS-SFISDET-GISE-NO,
+*                            WS-ISLEM-YIL, WS-ISLEM-AY, WS-ISLEM-GUN,
+*                            WS-FIS-TURU, WS-SEFSIRA-SIRA-NO,
+*                            S-ONCEKI-ACENTE-SICIL-NO(1:6),
+*                            WS-SFISDET-KONTROL-FLAG,
+*                            WS-SFISDET-SQL-ERR,
+*                            WS-SFISDET-SYS-ERR
+*
+
+*      IF WS-SFISDET-SQL-ERR NOT EQUAL 0
+*           MOVE "5921"                       TO WS-RESPONSE-CODE
+*            MOVE "95"                         TO WS-RESPONSE-COUNTER
+*            MOVE "WARNING"                    TO WS-HATA-MESAJI-TIPI
+*            MOVE WS-SFISDET-SQL-ERR TO SQLCODE OF SQLCA
+*            MOVE WS-SFISDET-SYS-ERR TO ERRCODE OF SQL-ERROR OF SQLCA(2)
+*            PERFORM HATA-VER-WORK
+*     ELSE
+*        IF WS-SFISDET-KONTROL-FLAG = "OK"
+*           CONTINUE
+*        ELSE
+*
+*            MOVE "5921"                       TO WS-RESPONSE-CODE
+*            MOVE "96"                         TO WS-RESPONSE-COUNTER
+*            MOVE "WARNING"                    TO WS-HATA-MESAJI-TIPI
+*           MOVE WS-SFISDET-SQL-ERR TO SQLCODE OF SQLCA
+*            MOVE WS-SFISDET-SYS-ERR TO ERRCODE OF SQL-ERROR OF SQLCA(2)
+*            PERFORM HATA-VER-WORK
+*        END-IF
+*     END-IF.
+
+
+* ACENTE-FIS-BUL-EXIT.
+*        EXIT.
+
+*******************************************************************************
+* FIS-TAHSILAT-DOVIZ SECTION.
+*
+*   MOVE "110" TO WS-FIS-TURU
+*   PERFORM C-SIRA-NO-AL
+*   IF OK-MSG = 0 AND OK-MSG-ENT = 0
+*      PERFORM D-FIS-BASLIK
+*   END-IF.
+*
+* INITIALIZE WS-TOPLAM-BORC-TUTAR,  WS-TOPLAM-ALACAK-TUTAR
+*
+**once parametre tablosundan select edilen hesap icin fisdetay ve ozethes
+**tablolarina kayit insert/update ediliyor.
+*
+*     MOVE GMU-DOVIZ-KASA-REF OF D-PARAM TO WS-HESAP-REF-NO
+*     MOVE WS-GISE-FIS-ACIKLAMA          TO WS-FIS-ACIKLAMA
+*     MOVE ENT-TUTAR          OF D-ENTEG TO WS-BORC-TUTAR
+*     MOVE 0                             TO WS-ALACAK-TUTAR
+*     MOVE ENT-DOVIZ-MIKTARI  OF D-ENTEG TO WS-DOVIZ-MIKTAR
+*     MOVE ENT-DOVIZ-KURU     OF D-ENTEG TO WS-DOVIZ-KURU
+*     MOVE ENT-DOVIZ-CINSI    OF D-ENTEG TO WS-ODEME-KODU
+*
+*     INITIALIZE D-HESPLAN, WS-DGT-KODU
+*
+*     PERFORM E10-HESPLANI-KONTROL
+*     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+*        PERFORM E30-FIS-ISLEMLERI-DEVAM
+*     END-IF.
+*
+**simdi entegrasyon tablosundaki hesap icin fisdetay ve ozethes tablolarina
+**kayit insert/update ediliyor.
+*     MOVE ENT-HESAP-REF-NO   OF D-ENTEG TO WS-HESAP-REF-NO
+*     MOVE WS-GISE-FIS-ACIKLAMA          TO WS-FIS-ACIKLAMA
+*     MOVE 0                             TO WS-BORC-TUTAR
+*     MOVE ENT-TUTAR          OF D-ENTEG TO WS-ALACAK-TUTAR
+*     MOVE ENT-DOVIZ-MIKTARI  OF D-ENTEG TO WS-DOVIZ-MIKTAR
+*     MOVE ENT-DOVIZ-KURU     OF D-ENTEG TO WS-DOVIZ-KURU
+*     MOVE ENT-DOVIZ-CINSI    OF D-ENTEG TO WS-ODEME-KODU
+*
+*     INITIALIZE D-HESPLAN, WS-DGT-KODU
+*
+*     PERFORM E10-HESPLANI-KONTROL
+*     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+*        PERFORM E30-FIS-ISLEMLERI-DEVAM
+*     END-IF.
+*
+*     IF WS-TOPLAM-BORC-TUTAR NOT EQUAL WS-TOPLAM-ALACAK-TUTAR
+*        DISPLAY "FÝÞÝN TOPLAM BORÇ TUTARI VE TOPLAM ALACAK TUTARI EÞÝT OLMALI!"
+*        PERFORM HATA-VER-WORK
+*     END-IF.
+*
+**doviz islemlerde doviz nazimlarinin da hareket gormesi icin ayrica bir
+**mahsup fisi kesiliyor.
+*
+*     PERFORM MAHSUP-FISI-DVZ-TAHSIL.
+*
+* FIS-TAHSILAT-DOVIZ-EXIT.
+*      EXIT.
+*******************************************************************************
+* MAHSUP-FISI-DVZ-TAHSIL SECTION.
+*
+*  MOVE "=ODEMEKOD"                TO WS-HATA-TABLE-NAME
+*  MOVE WS-KURULUS-KODU            TO GMU-KURULUS-KODU OF D-ODEKOD
+*  MOVE ENT-DOVIZ-CINSI OF D-ENTEG TO GMU-ODEME-KODU   OF D-ODEKOD
+*
+*   EXEC SQL
+*     SELECT GMU_HESAP_DOVIZ1_REF_NO,GMU_HESAP_DOVIZ2_REF_NO
+*          INTO :GMU-HESAP-DOVIZ1-REF-NO OF D-ODEKOD,
+*           :GMU-HESAP-DOVIZ2-REF-NO OF D-ODEKOD
+*      from  =odemekod
+*      WHERE GMU_KURULUS_KODU = :GMU-KURULUS-KODU OF D-ODEKOD AND
+*              GMU_ODEME_KODU = :GMU-ODEME-KODU   OF D-ODEKOD
+*      BROWSE ACCESS
+*   END-EXEC.
+*   EVALUATE SQLCODE OF SQLCA
+*   WHEN 0
+*     MOVE GMU-HESAP-ADI OF D-HESPLAN  TO ENT-HESAP-ADI   OF D-ENTEG
+***   MOVE GMU-ODEME-KODU OF D-HESPLAN TO ENT-DOVIZ-CINSI OF D-ENTEG
+*     IF NOT (GMU-ODEME-KODU OF D-HESPLAN = "TRL" OR
+*             GMU-ODEME-KODU OF D-HESPLAN = "TL " OR
+*             GMU-ODEME-KODU OF D-HESPLAN = "YTL")
+*        MOVE ODEME-KODU OF D-ISLEMTUR    TO ENT-DOVIZ-CINSI OF D-ENTEG
+*     ELSE
+*        MOVE GMU-ODEME-KODU OF D-HESPLAN TO ENT-DOVIZ-CINSI OF D-ENTEG
+*     END-IF
+*   WHEN 100
+*     PERFORM HATA-VER-WORK-100
+*     GO TO MAHSUP-FISI-DVZ-TAHSIL-EXIT
+*   WHEN OTHER
+*     PERFORM HATA-VER-WORK-OTHER
+*     GO TO MAHSUP-FISI-DVZ-TAHSIL-EXIT
+*   END-EVALUATE.
+*
+* MOVE "330" TO WS-FIS-TURU
+* PERFORM C-SIRA-NO-AL
+*   IF OK-MSG = 0 AND OK-MSG-ENT = 0
+*      PERFORM D-FIS-BASLIK
+*   END-IF.
+*
+* INITIALIZE WS-TOPLAM-BORC-TUTAR,  WS-TOPLAM-ALACAK-TUTAR
+*
+**once odemekod tablosundan select edilen doviz depo hesabi icin
+**fisdetay ve ozethes tablolarina kayit insert/update ediliyor.
+*
+*     MOVE GMU-HESAP-DOVIZ2-REF-NO OF D-ODEKOD TO WS-HESAP-REF-NO
+*     MOVE WS-GISE-FIS-ACIKLAMA                TO WS-FIS-ACIKLAMA
+*     MOVE ENT-DOVIZ-MIKTARI  OF D-ENTEG TO WS-BORC-TUTAR
+*     MOVE 0                             TO WS-ALACAK-TUTAR
+*     MOVE ENT-DOVIZ-MIKTARI  OF D-ENTEG TO WS-DOVIZ-MIKTAR
+*     MOVE ENT-DOVIZ-KURU     OF D-ENTEG TO WS-DOVIZ-KURU
+*     MOVE ENT-DOVIZ-CINSI    OF D-ENTEG TO WS-ODEME-KODU
+*
+*     INITIALIZE D-HESPLAN, WS-DGT-KODU
+*
+*     PERFORM E10-HESPLANI-KONTROL
+*     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+*        PERFORM E30-FIS-ISLEMLERI-DEVAM
+*     END-IF.
+*
+**simdi eodemekod tablosundan select edilen doviz mudi hesabi icin
+**fisdetay ve ozethes tablolarina kayit insert/update ediliyor.
+*
+*     MOVE GMU-HESAP-DOVIZ1-REF-NO OF D-ODEKOD TO WS-HESAP-REF-NO
+*     MOVE 0                                   TO WS-BORC-TUTAR
+*     MOVE ENT-DOVIZ-MIKTARI       OF D-ENTEG  TO WS-ALACAK-TUTAR
+*     MOVE ENT-DOVIZ-MIKTARI       OF D-ENTEG  TO WS-DOVIZ-MIKTAR
+*     MOVE ENT-DOVIZ-KURU          OF D-ENTEG  TO WS-DOVIZ-KURU
+*     MOVE ENT-DOVIZ-CINSI         OF D-ENTEG  TO WS-ODEME-KODU
+*
+*     INITIALIZE D-HESPLAN, WS-DGT-KODU
+*
+*     PERFORM E10-HESPLANI-KONTROL
+*     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+*        PERFORM E30-FIS-ISLEMLERI-DEVAM
+*     END-IF.
+*
+*     IF WS-TOPLAM-BORC-TUTAR NOT EQUAL WS-TOPLAM-ALACAK-TUTAR
+*        DISPLAY "FÝÞÝN TOPLAM BORÇ TUTARI VE TOPLAM ALACAK TUTARI EÞÝT OLMALI!"
+*        PERFORM HATA-VER-WORK
+*     END-IF.
+*
+*
+* MAHSUP-FISI-DVZ-TAHSIL-EXIT.
+*       EXIT.
+**********************************************************************************
+ FIS-TEDIYE-NAKIT SECTION.
+
+
+     IF ENT-ISLEM-TIPI OF D-ENTEG = 2
+        MOVE "220"                         TO WS-FIS-TURU
+        MOVE GMU-NAKIT-KASA-REF OF D-PARAM TO WS-HESAP-REF-NO
+        MOVE WS-GISE-FIS-ACIKLAMA          TO WS-FIS-ACIKLAMA
+     ELSE
+        IF ENT-ISLEM-TIPI OF D-ENTEG = 4
+           MOVE "223"               TO WS-FIS-TURU
+           MOVE S-ATM-TEDIYE-HESAP  TO WS-HESAP-REF-NO
+           MOVE WS-ATM-FIS-ACIKLAMA TO WS-FIS-ACIKLAMA
+        ELSE
+           IF ENT-ISLEM-TIPI OF D-ENTEG = 6
+              if s-acente-sicil-no = 777777 OR
+                 s-acente-sicil-no = 777776 or
+                 s-acente-sicil-no = 999998
+              move "330"                     to ws-fis-turu
+              else
+              MOVE "338"                     TO WS-FIS-TURU
+              end-if
+              MOVE WS-ACENTE-ALACAKLARI-REF  TO WS-HESAP-REF-NO
+*             MOVE WS-ACENTE-FIS-ACIKLAMA    TO WS-FIS-ACIKLAMA
+           END-IF
+        END-IF
+     END-IF.
+
+   IF ENT-ISLEM-TIPI OF D-ENTEG = 6
+      PERFORM ACENTE-YARDIMCI-KART-BUL
+   END-IF.
+
+   PERFORM C-SIRA-NO-AL
+   IF OK-MSG = 0 AND OK-MSG-ENT = 0
+      PERFORM D-FIS-BASLIK
+   END-IF.
+
+ INITIALIZE WS-TOPLAM-BORC-TUTAR,  WS-TOPLAM-ALACAK-TUTAR
+
+*once entegrasyon tablosundaki hesap icin fisdetay ve ozethes tablolarina
+*kayit insert/update ediliyor.
+
+     MOVE ENT-HESAP-REF-NO   OF D-ENTEG TO WS-HESAP-REF-NO
+     MOVE ENT-TUTAR          OF D-ENTEG TO WS-BORC-TUTAR
+     MOVE 0                             TO WS-ALACAK-TUTAR
+     MOVE ENT-DOVIZ-MIKTARI  OF D-ENTEG TO WS-DOVIZ-MIKTAR
+     MOVE ENT-DOVIZ-KURU     OF D-ENTEG TO WS-DOVIZ-KURU
+     MOVE ENT-DOVIZ-CINSI    OF D-ENTEG TO WS-ODEME-KODU
+
+     INITIALIZE D-HESPLAN, WS-DGT-KODU
+
+     PERFORM E10-HESPLANI-KONTROL
+     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+        PERFORM E20-KDV-KONTROL
+     END-IF
+
+     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+        PERFORM E30-FIS-ISLEMLERI-DEVAM
+     END-IF.
+
+* simdi de eger entegrasyonu yapilan hesap kdv'li bir hesapsa
+*kdv tutari icin bir kayit olusturuluyor.
+
+  IF WS-KDV-VAR-FLAG AND WS-KDV-TUTAR > 0
+
+     MOVE GMU-KDV-HESAP-REF-NO OF D-HESPLAN TO WS-HESAP-REF-NO
+     MOVE WS-KDV-TUTAR                      TO WS-BORC-TUTAR
+     MOVE 0                                 TO WS-ALACAK-TUTAR
+     MOVE ENT-DOVIZ-MIKTARI    OF D-ENTEG   TO WS-DOVIZ-MIKTAR
+     MOVE ENT-DOVIZ-KURU       OF D-ENTEG   TO WS-DOVIZ-KURU
+
+     INITIALIZE D-HESPLAN, WS-DGT-KODU
+
+     PERFORM E10-HESPLANI-KONTROL
+     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+        PERFORM E30-FIS-ISLEMLERI-DEVAM
+     END-IF
+   END-IF.
+
+*simdi de parametre tablosundan select edilen hesap icin fisdetay ve ozethes
+*tablolarina kayit insert/update ediliyor.
+
+   IF ENT-ISLEM-TIPI OF D-ENTEG = 2
+      MOVE GMU-NAKIT-KASA-REF OF D-PARAM TO WS-HESAP-REF-NO
+   ELSE
+      IF ENT-ISLEM-TIPI OF D-ENTEG = 4
+         MOVE S-ATM-TEDIYE-HESAP  TO WS-HESAP-REF-NO
+      ELSE
+         IF ENT-ISLEM-TIPI OF D-ENTEG = 6
+            MOVE WS-ACENTE-ALACAKLARI-REF TO WS-HESAP-REF-NO
+         END-IF
+      END-IF
+   END-IF.
+
+   MOVE 0                             TO WS-BORC-TUTAR
+   MOVE ENT-TUTAR          OF D-ENTEG TO WS-ALACAK-TUTAR
+   MOVE ENT-DOVIZ-MIKTARI  OF D-ENTEG TO WS-DOVIZ-MIKTAR
+   MOVE ENT-DOVIZ-KURU     OF D-ENTEG TO WS-DOVIZ-KURU
+   MOVE ENT-DOVIZ-CINSI    OF D-ENTEG TO WS-ODEME-KODU
+
+   INITIALIZE D-HESPLAN, WS-DGT-KODU
+
+   PERFORM E10-HESPLANI-KONTROL
+   IF OK-MSG = 0 AND OK-MSG-ENT = 0
+        PERFORM E20-KDV-KONTROL
+   END-IF
+
+   IF OK-MSG = 0 AND OK-MSG-ENT = 0
+     PERFORM E30-FIS-ISLEMLERI-DEVAM
+   END-IF.
+
+   IF WS-TOPLAM-BORC-TUTAR NOT EQUAL WS-TOPLAM-ALACAK-TUTAR
+      DISPLAY "FÝÞÝN TOPLAM BORÇ TUTARI VE TOPLAM ALACAK TUTARI EÞÝT OLMALI!"
+      PERFORM HATA-VER-WORK
+   END-IF.
+
+ FIS-TEDIYE-NAKIT-EXIT.
+      EXIT.
+*******************************************************************************
+* FIS-TEDIYE-DOVIZ SECTION.
+*
+*   MOVE "220" TO WS-FIS-TURU
+*   PERFORM C-SIRA-NO-AL
+*   IF OK-MSG = 0 AND OK-MSG-ENT = 0
+*      MOVE WS-GISE-FIS-ACIKLAMA TO WS-FIS-ACIKLAMA
+*      PERFORM D-FIS-BASLIK
+*   END-IF.
+*
+* INITIALIZE WS-TOPLAM-BORC-TUTAR,  WS-TOPLAM-ALACAK-TUTAR
+*
+**once entegrasyon tablosundaki hesap icin fisdetay ve ozethes tablolarina
+**kayit insert/update ediliyor.
+*   MOVE ENT-HESAP-REF-NO   OF D-ENTEG TO WS-HESAP-REF-NO
+*   MOVE WS-GISE-FIS-ACIKLAMA          TO WS-FIS-ACIKLAMA
+*   MOVE ENT-TUTAR          OF D-ENTEG TO WS-BORC-TUTAR
+*   MOVE 0                             TO WS-ALACAK-TUTAR
+*   MOVE ENT-DOVIZ-MIKTARI  OF D-ENTEG TO WS-DOVIZ-MIKTAR
+*   MOVE ENT-DOVIZ-KURU     OF D-ENTEG TO WS-DOVIZ-KURU
+*   MOVE ENT-DOVIZ-CINSI    OF D-ENTEG TO WS-ODEME-KODU
+*
+*   INITIALIZE D-HESPLAN, WS-DGT-KODU
+*
+*  PERFORM E10-HESPLANI-KONTROL
+*  IF OK-MSG = 0 AND OK-MSG-ENT = 0
+*     PERFORM E30-FIS-ISLEMLERI-DEVAM
+*  END-IF.
+*
+**sonra parametre tablosundan select edilen hesap icin fisdetay ve ozethes
+**tablolarina kayit insert/update ediliyor.
+*
+*   MOVE GMU-DOVIZ-KASA-REF OF D-PARAM TO WS-HESAP-REF-NO
+*   MOVE WS-GISE-FIS-ACIKLAMA          TO WS-FIS-ACIKLAMA
+*   MOVE 0                             TO WS-BORC-TUTAR
+*   MOVE ENT-TUTAR          OF D-ENTEG TO WS-ALACAK-TUTAR
+*   MOVE ENT-DOVIZ-MIKTARI  OF D-ENTEG TO WS-DOVIZ-MIKTAR
+*   MOVE ENT-DOVIZ-KURU     OF D-ENTEG TO WS-DOVIZ-KURU
+*   MOVE ENT-DOVIZ-CINSI    OF D-ENTEG TO WS-ODEME-KODU
+*
+*   INITIALIZE D-HESPLAN, WS-DGT-KODU
+*
+*   PERFORM E10-HESPLANI-KONTROL
+*   IF OK-MSG = 0 AND OK-MSG-ENT = 0
+*      PERFORM E30-FIS-ISLEMLERI-DEVAM
+*   END-IF.
+*
+*   IF WS-TOPLAM-BORC-TUTAR NOT EQUAL WS-TOPLAM-ALACAK-TUTAR
+*      DISPLAY "FÝÞÝN TOPLAM BORÇ TUTARI VE TOPLAM ALACAK TUTARI EÞÝT OLMALI!"
+*      PERFORM HATA-VER-WORK
+*   END-IF.
+*
+**doviz islemlerde doviz nazimlarinin da hareket gormesi icin ayrica bir
+**mahsup fisi kesiliyor.
+*
+*    PERFORM MAHSUP-FISI-DVZ-TEDIYE.
+*
+* FIS-TEDIYE-DOVIZ-EXIT.
+*      EXIT.
+*******************************************************************************
+* MAHSUP-FISI-DVZ-TEDIYE SECTION.
+*
+*  MOVE "=ODEMEKOD"                TO WS-HATA-TABLE-NAME
+*  MOVE WS-KURULUS-KODU            TO GMU-KURULUS-KODU OF D-ODEKOD
+*  MOVE ENT-DOVIZ-CINSI OF D-ENTEG TO GMU-ODEME-KODU   OF D-ODEKOD
+*
+*   EXEC SQL
+*     SELECT GMU_HESAP_DOVIZ1_REF_NO,GMU_HESAP_DOVIZ2_REF_NO
+*          INTO :GMU-HESAP-DOVIZ1-REF-NO OF D-ODEKOD,
+*           :GMU-HESAP-DOVIZ2-REF-NO OF D-ODEKOD
+*      from =odemekod
+*      WHERE GMU_KURULUS_KODU = :GMU-KURULUS-KODU OF D-ODEKOD AND
+*              GMU_ODEME_KODU = :GMU-ODEME-KODU   OF D-ODEKOD
+*      BROWSE ACCESS
+*   END-EXEC.
+*   EVALUATE SQLCODE OF SQLCA
+*   WHEN 0
+*     MOVE GMU-HESAP-ADI OF D-HESPLAN  TO ENT-HESAP-ADI   OF D-ENTEG
+***   MOVE GMU-ODEME-KODU OF D-HESPLAN TO ENT-DOVIZ-CINSI OF D-ENTEG
+*     IF NOT (GMU-ODEME-KODU OF D-HESPLAN = "TRL" OR
+*             GMU-ODEME-KODU OF D-HESPLAN = "TL " OR
+*             GMU-ODEME-KODU OF D-HESPLAN = "YTL")
+*        MOVE ODEME-KODU OF D-ISLEMTUR    TO ENT-DOVIZ-CINSI OF D-ENTEG
+*     ELSE
+*        MOVE GMU-ODEME-KODU OF D-HESPLAN TO ENT-DOVIZ-CINSI OF D-ENTEG
+*     END-IF
+*   WHEN 100
+*     PERFORM HATA-VER-WORK-100
+*     GO TO MAHSUP-FISI-DVZ-TEDIYE-EXIT
+*
+*
+*
+*
+*   WHEN OTHER
+*     PERFORM HATA-VER-WORK-OTHER
+*     GO TO MAHSUP-FISI-DVZ-TEDIYE-EXIT
+*   END-EVALUATE.
+*
+* MOVE "330" TO WS-FIS-TURU
+* PERFORM C-SIRA-NO-AL
+*   IF OK-MSG = 0 AND OK-MSG-ENT = 0
+*      PERFORM D-FIS-BASLIK
+*   END-IF.
+*
+* INITIALIZE WS-TOPLAM-BORC-TUTAR,  WS-TOPLAM-ALACAK-TUTAR
+*
+**once eodemekod tablosundan select edilen doviz mudi hesabi icin
+**fisdetay ve ozethes tablolarina kayit insert/update ediliyor.
+*
+*     MOVE GMU-HESAP-DOVIZ1-REF-NO OF D-ODEKOD TO WS-HESAP-REF-NO
+*     MOVE ENT-DOVIZ-MIKTARI       OF D-ENTEG  TO WS-BORC-TUTAR
+*     MOVE 0                                   TO WS-ALACAK-TUTAR
+*     MOVE ENT-DOVIZ-MIKTARI       OF D-ENTEG  TO WS-DOVIZ-MIKTAR
+*     MOVE ENT-DOVIZ-KURU          OF D-ENTEG  TO WS-DOVIZ-KURU
+*     MOVE ENT-DOVIZ-CINSI         OF D-ENTEG  TO WS-ODEME-KODU
+*
+*     INITIALIZE D-HESPLAN, WS-DGT-KODU
+*
+*     PERFORM E10-HESPLANI-KONTROL
+*     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+*        PERFORM E30-FIS-ISLEMLERI-DEVAM
+*     END-IF.
+*
+**simdi de odemekod tablosundan select edilen doviz depo hesabi icin
+**fisdetay ve ozethes tablolarina kayit insert/update ediliyor.
+*
+*     MOVE GMU-HESAP-DOVIZ2-REF-NO OF D-ODEKOD TO WS-HESAP-REF-NO
+*     MOVE WS-GISE-FIS-ACIKLAMA                TO WS-FIS-ACIKLAMA
+*     MOVE 0                                   TO WS-BORC-TUTAR
+*     MOVE ENT-DOVIZ-MIKTARI  OF D-ENTEG       TO WS-ALACAK-TUTAR
+*     MOVE ENT-DOVIZ-MIKTARI  OF D-ENTEG       TO WS-DOVIZ-MIKTAR
+*     MOVE ENT-DOVIZ-KURU     OF D-ENTEG       TO WS-DOVIZ-KURU
+*     MOVE ENT-DOVIZ-CINSI    OF D-ENTEG       TO WS-ODEME-KODU
+*
+*     INITIALIZE D-HESPLAN, WS-DGT-KODU
+*
+*     PERFORM E10-HESPLANI-KONTROL
+*     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+*        PERFORM E30-FIS-ISLEMLERI-DEVAM
+*     END-IF.
+*
+*    IF WS-TOPLAM-BORC-TUTAR NOT EQUAL WS-TOPLAM-ALACAK-TUTAR
+*       DISPLAY "FÝÞÝN TOPLAM BORÇ TUTARI VE TOPLAM ALACAK TUTARI EÞÝT OLMALI!"
+*       PERFORM HATA-VER-WORK
+*    END-IF.
+*
+* MAHSUP-FISI-DVZ-TEDIYE-EXIT.
+*       EXIT.
+**********************************************************************************
+*B-MIZAN-DONEMI-KAPALIMI SECTION.
+*
+* MOVE "=DONKAPA"      TO WS-HATA-TABLE-NAME
+* MOVE WS-KURULUS-KODU TO GMU-KURULUS-KODU OF D-DONKAPA
+* MOVE WS-ISLEM-YIL    TO GMU-YIL          OF D-DONKAPA
+* MOVE WS-ISLEM-AY     TO GMU-AY           OF D-DONKAPA
+*
+* EXEC SQL
+*   SELECT  GMU_DURUM
+*     INTO :GMU-DURUM OF D-DONKAPA
+*   FROM =DONKAPA
+*   WHERE GMU_KURULUS_KODU = :GMU-KURULUS-KODU OF D-DONKAPA AND
+*                  GMU_YIL = :GMU-YIL          OF D-DONKAPA AND
+*                   GMU_AY = :GMU-AY           OF D-DONKAPA
+*   BROWSE ACCESS
+* END-EXEC.
+* EVALUATE SQLCODE OF SQLCA
+*   WHEN 0
+*     IF GMU-DURUM OF D-DONKAPA = "ACIK" OR GMU-DURUM OF D-DONKAPA = "AÇIK"
+*        CONTINUE
+*     ELSE
+*        MOVE "5921"    TO WS-RESPONSE-CODE
+*        MOVE "GÝRMEK ÝSTEDÝÐÝNÝZ FÝÞE AÝT MÝZAN DÖNEMÝ KAPATILMIÞTIR!" TO
+*                                                            WS-HATA-MESAJI
+*        MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+*        MOVE "25"      TO WS-RESPONSE-COUNTER
+*        PERFORM HATA-VER-WORK
+*        GO TO B-MIZAN-DONEMI-KAPALIMI-EXIT
+*     END-IF
+*   WHEN 100
+*     MOVE 0 TO SQLCODE OF SQLCA
+*     CONTINUE
+*   WHEN OTHER
+*     PERFORM HATA-VER-WORK-OTHER
+*  END-EVALUATE.
+
+*B-MIZAN-DONEMI-KAPALIMI-EXIT.
+*                 EXIT.
+******************************************************************************
+ C-SIRA-NO-AL SECTION.
+
+        MOVE "SEFSIRA"                  TO WS-HATA-SUBPROG-NAME
+        MOVE WS-KURULUS-KODU            TO WS-SEFSIRA-KURULUS-KODU
+        MOVE ENT-BOLGE-KODU OF D-ENTEG  TO WS-SEFSIRA-BOLGE-KODU
+        MOVE ENT-MERKEZ-NO  OF D-ENTEG  TO WS-SEFSIRA-MERKEZ-NO
+        MOVE 0                          TO WS-SEFSIRA-SUBE-NO
+        MOVE 1                          TO WS-SEFSIRA-GISE-NO
+        MOVE WS-FIS-TURU                TO WS-SEFSIRA-FIS-TURU
+        MOVE WS-ISLEM-YIL               TO WS-SEFSIRA-YIL
+        MOVE WS-ISLEM-AY                TO WS-SEFSIRA-AY
+        MOVE WS-ISLEM-GUN               TO WS-SEFSIRA-GUN
+
+        INITIALIZE WS-SEFSIRA-SYS-ERR, WS-SEFSIRA-SQL-ERR, WS-SEFSIRA-SIRA-NO
+        CALL "SEFSIRA" USING  WS-SEFSIRA-KURULUS-KODU, WS-SEFSIRA-BOLGE-KODU,
+                              WS-SEFSIRA-MERKEZ-NO, WS-SEFSIRA-SUBE-NO,
+                              WS-SEFSIRA-GISE-NO, WS-SEFSIRA-FIS-TURU,
+                              WS-SEFSIRA-YIL, WS-SEFSIRA-AY, WS-SEFSIRA-GUN,
+                              WS-SEFSIRA-SIRA-NO, WS-SEFSIRA-SQL-ERR,
+                              WS-SEFSIRA-SYS-ERR
+
+        IF WS-SEFSIRA-SQL-ERR NOT EQUAL 0
+           MOVE "5921"    TO WS-RESPONSE-CODE
+           STRING "SEFSIRA SUBPROGRAMI HATALI BÝTTÝ,YETKÝLÝLERE HABER VERÝNÝZ!"
+           DELIMITED BY SIZE  INTO WS-HATA-MESAJI
+           MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+           MOVE "27"      TO WS-RESPONSE-COUNTER
+           MOVE WS-SEFSIRA-SQL-ERR TO SQLCODE OF SQLCA
+           MOVE WS-SEFSIRA-SYS-ERR TO ERRCODE OF SQL-ERROR OF SQLCA(2)
+           PERFORM HATA-VER-WORK
+        ELSE
+          CONTINUE
+        END-IF.
+
+ C-SIRA-NO-AL-EXIT.
+       EXIT.
+******************************************************************************
+ D-FIS-BASLIK SECTION.
+
+   MOVE "=ISLEMID"                  TO WS-HATA-TABLE-NAME
+   MOVE WS-KURULUS-KODU             TO GMU-KURULUS-KODU OF D-ISLEMID
+   MOVE ENT-ISLEM-YIL    OF D-ENTEG TO GMU-ISLEM-YIL    OF D-ISLEMID
+   MOVE ENT-BOLGE-KODU   OF D-ENTEG TO GMU-BOLGE-KODU   OF D-ISLEMID
+   MOVE ENT-MERKEZ-NO    OF D-ENTEG TO GMU-MERKEZ-NO    OF D-ISLEMID
+
+
+   EXEC SQL
+     SELECT GMU_ISLEM_ID INTO :GMU-ISLEM-ID OF D-ISLEMID
+     FROM =ISLEMID
+     WHERE GMU_KURULUS_KODU = :GMU-KURULUS-KODU OF D-ISLEMID AND
+              GMU_ISLEM_YIL = :GMU-ISLEM-YIL    OF D-ISLEMID AND
+             GMU_BOLGE_KODU = :GMU-BOLGE-KODU   OF D-ISLEMID AND
+              GMU_MERKEZ_NO = :GMU-MERKEZ-NO    OF D-ISLEMID
+     BROWSE ACCESS
+   END-EXEC.
+   EVALUATE SQLCODE OF SQLCA
+     WHEN 0
+       CONTINUE
+     WHEN 100
+       MOVE 0 TO SQLCODE OF SQLCA
+       MOVE 0 TO GMU-ISLEM-ID OF D-ISLEMID
+     WHEN OTHER
+       MOVE "5990"        TO WS-RESPONSE-CODE
+       MOVE "OTHER"       TO WS-HATA-MESAJI-TIPI
+       SET WS-FATAL-ERROR TO TRUE
+       MOVE "28"          TO WS-RESPONSE-COUNTER
+       PERFORM HATA-VER-WORK
+   END-EVALUATE.
+
+   MOVE "SFISBAS"                  TO WS-HATA-SUBPROG-NAME
+   MOVE WS-KURULUS-KODU            TO WS-SFISBAS-KURULUS-KODU
+   IF IOSUBE-NO OF D-OZET = 99 OR IOSUBE-NO OF D-OZET = 2
+      IF WS-ILKMI = 1 AND NOT WS-YENI-SUBE-FLAG
+         MOVE ENT-BOLGE-KODU OF D-ENTEG  TO WS-SFISBAS-BOLGE-KODU
+         MOVE ENT-MERKEZ-NO  OF D-ENTEG  TO WS-SFISBAS-MERKEZ-NO
+      ELSE
+         MOVE S-ONCEKI-ENTEG-BOLGE-KODU  TO WS-SFISBAS-BOLGE-KODU
+         MOVE S-ONCEKI-ENTEG-MERKEZ-NO   TO WS-SFISBAS-MERKEZ-NO
+      END-IF
+   ELSE
+      MOVE ENT-BOLGE-KODU OF D-ENTEG  TO WS-SFISBAS-BOLGE-KODU
+      MOVE ENT-MERKEZ-NO  OF D-ENTEG  TO WS-SFISBAS-MERKEZ-NO
+   END-IF
+   MOVE 0                          TO WS-SFISBAS-SUBE-NO
+   MOVE 1                          TO WS-SFISBAS-GISE-NO
+   MOVE WS-ISLEM-YIL               TO WS-SFISBAS-ISLEM-YIL
+   MOVE WS-ISLEM-AY                TO WS-SFISBAS-ISLEM-AY
+   MOVE WS-ISLEM-GUN               TO WS-SFISBAS-ISLEM-GUN
+   MOVE WS-FIS-TURU                TO WS-SFISBAS-FIS-TURU
+
+   MOVE FUNCTION CURRENT-DATE(1:8) TO WS-CURRENT-DATE
+
+   MOVE WS-SEFSIRA-SIRA-NO TO WS-SFISBAS-FIS-NO
+
+     MOVE WS-FIS-ACIKLAMA  TO WS-SFISBAS-FIS-ACIKLAMA
+     MOVE 0                TO WS-SFISBAS-KARSI-BOLGE-KODU
+     MOVE 0                TO WS-SFISBAS-KARSI-MERKEZ-NO
+     MOVE 0                TO WS-SFISBAS-KARSI-BELGE-YIL
+     MOVE 0                TO WS-SFISBAS-KARSI-BELGE-AY
+     MOVE 0                TO WS-SFISBAS-KARSI-BELGE-GUN
+     MOVE SPACE            TO WS-SFISBAS-KARSI-BELGE-TURU
+     MOVE 0                TO WS-SFISBAS-KARSI-BELGE-NO
+     MOVE SPACE            TO WS-SFISBAS-KASA-ONAY
+     MOVE 1                TO WS-SFISBAS-FIS-STATUS
+     MOVE WS-ISLEM-YIL     TO WS-SFISBAS-VALOR-YIL
+     MOVE WS-ISLEM-AY      TO WS-SFISBAS-VALOR-AY
+     MOVE WS-ISLEM-GUN     TO WS-SFISBAS-VALOR-GUN
+     MOVE 0                TO WS-SFISBAS-MADDE-NO
+     MOVE 0                TO WS-SFISBAS-DEFTER
+     MOVE 999888           TO WS-SFISBAS-EKL-SICIL-NO
+     COMPUTE WS-SFISBAS-ISLEM-ID = GMU-ISLEM-ID OF D-ISLEMID + 1
+
+     COMPUTE WS-VALOR-TARIHI = WS-ISLEM-YIL * 10000 +
+                               WS-ISLEM-AY  * 100   +
+                               WS-ISLEM-GUN
+  CALL "SFISBAS" USING WS-SFISBAS-KURULUS-KODU, WS-SFISBAS-BOLGE-KODU,
+                       WS-SFISBAS-MERKEZ-NO, WS-SFISBAS-SUBE-NO,
+                       WS-SFISBAS-GISE-NO,   WS-SFISBAS-ISLEM-YIL,
+                       WS-SFISBAS-ISLEM-AY,  WS-SFISBAS-ISLEM-GUN,
+                       WS-SFISBAS-FIS-TURU,  WS-SFISBAS-FIS-NO,
+                       WS-SFISBAS-ISLEM-ID,  WS-SFISBAS-FIS-ACIKLAMA,
+                       WS-SFISBAS-KARSI-BOLGE-KODU, WS-SFISBAS-KARSI-MERKEZ-NO,
+                       WS-SFISBAS-KARSI-BELGE-YIL, WS-SFISBAS-KARSI-BELGE-AY,
+                       WS-SFISBAS-KARSI-BELGE-GUN, WS-SFISBAS-KARSI-BELGE-TURU,
+                       WS-SFISBAS-KARSI-BELGE-NO, WS-SFISBAS-KASA-ONAY,
+                       WS-SFISBAS-FIS-STATUS, WS-SFISBAS-VALOR-YIL,
+                       WS-SFISBAS-VALOR-AY,   WS-SFISBAS-VALOR-GUN,
+                       WS-SFISBAS-MADDE-NO,   WS-SFISBAS-DEFTER,
+                       WS-SFISBAS-EKL-SICIL-NO, WS-SFISBAS-KONTROL-FLAG,
+                       WS-SFISBAS-HATA-MESAJI,  WS-SFISBAS-SQL-ERR,
+                       WS-SFISBAS-SYS-ERR.
+   IF WS-SFISBAS-SQL-ERR NOT EQUAL 0
+     MOVE "5930"                 TO WS-RESPONSE-CODE
+     MOVE "29"                   TO WS-RESPONSE-COUNTER
+     MOVE "WARNING"              TO WS-HATA-MESAJI-TIPI
+     MOVE WS-SFISBAS-HATA-MESAJI TO WS-HATA-MESAJI
+     MOVE WS-SFISBAS-SQL-ERR TO SQLCODE OF SQLCA
+     MOVE WS-SFISBAS-SYS-ERR TO ERRCODE OF SQL-ERROR OF SQLCA(2)
+     PERFORM HATA-VER-WORK
+  ELSE
+     IF WS-SFISBAS-KONTROL-FLAG = "OK"
+        CONTINUE
+     ELSE
+        MOVE "5921"                       TO WS-RESPONSE-CODE
+        MOVE "30"                         TO WS-RESPONSE-COUNTER
+        MOVE "WARNING"                    TO WS-HATA-MESAJI-TIPI
+        MOVE WS-SFISBAS-HATA-MESAJI TO WS-HATA-MESAJI
+        MOVE WS-SFISBAS-SQL-ERR TO SQLCODE OF SQLCA
+        MOVE WS-SFISBAS-SYS-ERR TO ERRCODE OF SQL-ERROR OF SQLCA(2)
+        PERFORM HATA-VER-WORK
+      END-IF
+   END-IF.
+
+  D-FIS-BASLIK-EXIT.
+       EXIT.
+*******************************************************************************
+ E10-HESPLANI-KONTROL SECTION.
+
+  MOVE "SHESPLA"          TO WS-HATA-SUBPROG-NAME
+  MOVE WS-KURULUS-KODU   TO WS-SHESPLA-KURULUS-KODU
+  MOVE WS-HESAP-REF-NO    TO WS-SHESPLA-HES-REF-NO
+
+  INITIALIZE WS-SHESPLA-SYS-ERR, WS-SHESPLA-SQL-ERR, WS-SHESPLA-KONTROL-FLAG
+  CALL "SHESPLA" USING WS-SHESPLA-KURULUS-KODU, WS-SHESPLA-HES-REF-NO,
+                       WS-SHESPLA-KONTROL-FLAG, WS-SHESPLA-SQL-ERR,
+                       WS-SHESPLA-SYS-ERR.
+
+  IF WS-SHESPLA-SQL-ERR NOT EQUAL 0
+     IF WS-SHESPLA-SQL-ERR NOT EQUAL 100
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING "SHESPLA SUBPROGRAMI HATALI BÝTTÝ,YETKÝLÝLERE HABER VERÝNÝZ!"
+          DELIMITED BY SIZE  INTO WS-HATA-MESAJI
+          DISPLAY "HESAP-NO :"  WS-SHESPLA-HES-REF-NO
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "31"      TO WS-RESPONSE-COUNTER
+          MOVE WS-SHESPLA-SQL-ERR TO SQLCODE OF SQLCA
+          MOVE WS-SHESPLA-SYS-ERR TO ERRCODE OF SQL-ERROR OF SQLCA(2)
+          PERFORM HATA-VER-WORK
+     ELSE
+          MOVE "5921"    TO WS-RESPONSE-CODE
+          STRING "GÝRDÝÐÝNÝZ HESAP NUMARASI GEÇERLÝ DEÐÝL!"
+          DELIMITED BY SIZE  INTO WS-HATA-MESAJI
+          DISPLAY "HESAP-NO :"  WS-SHESPLA-HES-REF-NO
+          DISPLAY "ISLEM-TURU : " IOISLEM-TURU OF D-OZET
+          MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+          MOVE "32"      TO WS-RESPONSE-COUNTER
+          MOVE WS-SHESPLA-SQL-ERR TO SQLCODE OF SQLCA
+          MOVE WS-SHESPLA-SYS-ERR TO ERRCODE OF SQL-ERROR OF SQLCA(2)
+          PERFORM HATA-VER-WORK
+     END-IF
+  ELSE
+     CONTINUE
+  END-IF.
+
+  MOVE "=HESPLANI" TO WS-HATA-TABLE-NAME
+  MOVE WS-KURULUS-KODU    TO GMU-KURULUS-KODU OF D-HESPLAN
+  MOVE WS-HESAP-REF-NO    TO GMU-HESAP-REF-NO OF D-HESPLAN
+
+     EXEC SQL
+       SELECT GMU_DETAY_DURUMU,GMU_BUTCE_DURUMU,
+              GMU_YANSITMA_DURUMU,GMU_HESAP_SINIF,
+              GMU_DGT_TIPI,GMU_YRD_KART_DURUMU,
+              GMU_ODEME_KODU,GMU_HESAP_ADI
+         INTO :GMU-DETAY-DURUMU     OF D-HESPLAN,
+              :GMU-BUTCE-DURUMU     OF D-HESPLAN,
+              :GMU-YANSITMA-DURUMU  OF D-HESPLAN,
+              :GMU-HESAP-SINIF      OF D-HESPLAN,
+              :GMU-DGT-TIPI         OF D-HESPLAN,
+              :GMU-YRD-KART-DURUMU  OF D-HESPLAN,
+              :GMU-ODEME-KODU       OF D-HESPLAN,
+              :GMU-HESAP-ADI        OF D-HESPLAN
+       FROM =HESPLANI
+       WHERE GMU_KURULUS_KODU = :GMU-KURULUS-KODU OF D-HESPLAN AND
+             GMU_HESAP_REF_NO = :GMU-HESAP-REF-NO OF D-HESPLAN
+       BROWSE ACCESS
+     END-EXEC.
+     EVALUATE SQLCODE OF SQLCA
+        WHEN 0
+          IF GMU-DETAY-DURUMU OF D-HESPLAN = "U"
+             PERFORM Z-HESAP-NO-BUL
+             MOVE "5921"    TO WS-RESPONSE-CODE
+             STRING WS-SHESNO-HESAP-NO  DELIMITED BY SPACE
+             " HESABI DETAY HESABI DEÐÝL,LÜTFEN" DELIMITED BY SIZE
+             " YENÝ HESAP SEÇÝNÝZ!" DELIMITED BY SIZE INTO WS-HATA-MESAJI
+             MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+             MOVE "33"      TO WS-RESPONSE-COUNTER
+             PERFORM HATA-VER-WORK
+          END-IF
+        WHEN 100
+     display "-------------------------------------"
+     display " islem-turu : " islem-turu of d-islemtur
+     display "-------------------------------------"
+     DISPLAY " HESAP-REF-NO : " GMU-HESAP-REF-NO OF D-HESPLAN
+
+          MOVE "5990"        TO WS-RESPONSE-CODE
+          MOVE "NOT-FOUND"   TO WS-HATA-MESAJI-TIPI
+          MOVE "34"          TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+         WHEN OTHER
+     display "-------------------------------------"
+     display " islem-turu : " islem-turu of d-islemtur
+     display "-------------------------------------"
+     DISPLAY " HESAP-REF-NO : " GMU-HESAP-REF-NO OF D-HESPLAN
+          MOVE "5990"        TO WS-RESPONSE-CODE
+          MOVE "OTHER"       TO WS-HATA-MESAJI-TIPI
+          SET WS-FATAL-ERROR TO TRUE
+          MOVE "35"          TO WS-RESPONSE-COUNTER
+          PERFORM HATA-VER-WORK
+     END-EVALUATE.
+
+ E10-HESPLANI-KONTROL-EXIT.
+       EXIT.
+******************************************************************************
+ E20-KDV-KONTROL SECTION.
+
+    MOVE "=HESPLANI"       TO WS-HATA-TABLE-NAME
+    MOVE WS-KURULUS-KODU   TO GMU-KURULUS-KODU OF D-HESPLAN
+    MOVE WS-HESAP-REF-NO   TO GMU-HESAP-REF-NO OF D-HESPLAN
+    INITIALIZE WS-FLAG4, WS-FLAG5, WS-FLAG6
+
+   EXEC SQL
+      SELECT GMU_BUTCE_DURUMU,
+             GMU_KDV_ORAN,
+             GMU_KDV_HESAP_REF_NO,
+             GMU_KDV
+      INTO :GMU-BUTCE-DURUMU     OF D-HESPLAN,
+           :GMU-KDV-ORAN         OF D-HESPLAN,
+           :GMU-KDV-HESAP-REF-NO OF D-HESPLAN,
+           :GMU-KDV              OF D-HESPLAN
+      FROM =HESPLANI
+      WHERE   GMU_KURULUS_KODU = :GMU-KURULUS-KODU  OF D-HESPLAN AND
+              GMU_HESAP_REF_NO = :GMU-HESAP-REF-NO  OF D-HESPLAN
+      BROWSE ACCESS
+   END-EXEC.
+   EVALUATE SQLCODE OF SQLCA
+     WHEN 0
+**hgs ve 380 li hesaplar i‡in kapatildi(11.1.2017)
+**       IF GMU-BUTCE-DURUMU OF D-HESPLAN = "GG"              AND
+    if    GMU-KDV-ORAN OF D-HESPLAN NOT EQUAL 0             AND
+          GMU-KDV-HESAP-REF-NO OF D-HESPLAN NOT EQUAL SPACE
+*          WS-ALACAK-TUTAR > 0
+*sadece bsmv'li hesaplar kdv haric calisiyor ve "740.06.002.002.004.004.005"
+*ve "360.01.003" hesaplara bsmv orani icin ayri bir mahsup fisi kesilmesi
+*isteniyor.
+             IF GMU-KDV OF D-HESPLAN = "H"
+                SET WS-KDV-HARIC-FLAG TO TRUE
+             ELSE
+                IF GMU-KDV OF D-HESPLAN = "D"
+                   SET WS-KDV-VAR-FLAG TO TRUE
+                   PERFORM E20-1-KDV-HESAPLA
+                END-IF
+             END-IF
+       END-IF
+     WHEN 100
+     display "-------------------------------------"
+     display " islem-turu : " islem-turu of d-islemtur
+     display "-------------------------------------"
+     DISPLAY " HESAP-REF-NO : " GMU-HESAP-REF-NO OF D-HESPLAN
+
+       MOVE "5990"        TO WS-RESPONSE-CODE
+       MOVE "NOT-FOUND"   TO WS-HATA-MESAJI-TIPI
+       MOVE "36"          TO WS-RESPONSE-COUNTER
+       PERFORM HATA-VER-WORK
+     WHEN OTHER
+     display "-------------------------------------"
+     display " islem-turu : " islem-turu of d-islemtur
+     display "-------------------------------------"
+     DISPLAY " HESAP-REF-NO : " GMU-HESAP-REF-NO OF D-HESPLAN
+
+       MOVE "5990"        TO WS-RESPONSE-CODE
+       MOVE "OTHER"       TO WS-HATA-MESAJI-TIPI
+       SET WS-FATAL-ERROR TO TRUE
+       MOVE "37"          TO WS-RESPONSE-COUNTER
+       PERFORM HATA-VER-WORK
+   END-EVALUATE.
+
+ E20-KDV-KONTROL-EXIT.
+      EXIT.
+******************************************************************************
+ E20-1-KDV-HESAPLA SECTION.
+
+  IF GMU-KDV-ORAN OF D-HESPLAN > 0
+     IF GMU-KDV EQUAL SPACE
+        MOVE "5921"    TO WS-RESPONSE-CODE
+        STRING "HESAP PLANINDA KDV DAHÝL/HARÝÇ BÝLGÝSÝ TANIMLANMAMIÞ!"
+        DELIMITED BY SIZE INTO WS-HATA-MESAJI
+        MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+        MOVE "38"      TO WS-RESPONSE-COUNTER
+        PERFORM HATA-VER-WORK
+      END-IF
+   END-IF
+
+   IF GMU-KDV OF D-HESPLAN = "D"
+      MOVE GMU-KDV-HESAP-REF-NO OF D-HESPLAN TO WS-KDV-HESAP-REF-NO
+      SET WS-KDV-DAHIL-FLAG TO TRUE
+   END-IF.
+
+   IF GMU-KDV OF D-HESPLAN = "H"
+      MOVE GMU-KDV-HESAP-REF-NO OF D-HESPLAN TO WS-KDV-HESAP-REF-NO
+      SET WS-KDV-HARIC-FLAG TO TRUE
+   END-IF.
+
+ IF WS-KDV-DAHIL-FLAG
+    IF WS-ALACAK-TUTAR > 0
+       MOVE WS-ALACAK-TUTAR TO WS-TEMP-TUTAR
+    END-IF
+    IF WS-BORC-TUTAR > 0
+       MOVE WS-BORC-TUTAR TO WS-TEMP-TUTAR
+    END-IF
+
+    COMPUTE WS-KDV-TUTAR ROUNDED = (WS-TEMP-TUTAR * GMU-KDV-ORAN OF D-HESPLAN)/
+                                   (100 + GMU-KDV-ORAN OF D-HESPLAN)
+    COMPUTE WS-TEMP-TUTAR = WS-TEMP-TUTAR - WS-KDV-TUTAR
+    IF WS-ALACAK-TUTAR > 0
+       MOVE WS-TEMP-TUTAR TO WS-ALACAK-TUTAR
+    END-IF
+    IF WS-BORC-TUTAR > 0
+       MOVE WS-TEMP-TUTAR TO WS-BORC-TUTAR
+    END-IF
+  END-IF.
+
+  IF WS-KDV-HARIC-FLAG
+    IF WS-ALACAK-TUTAR > 0
+       MOVE WS-ALACAK-TUTAR TO WS-TEMP-TUTAR
+    END-IF
+    IF WS-BORC-TUTAR > 0
+       MOVE WS-BORC-TUTAR TO WS-TEMP-TUTAR
+    END-IF
+
+    COMPUTE WS-KDV-TUTAR ROUNDED = (WS-TEMP-TUTAR * GMU-KDV-ORAN OF D-HESPLAN)/
+                                   (100)
+    COMPUTE WS-TEMP-TUTAR = WS-TEMP-TUTAR - WS-KDV-TUTAR
+    IF WS-ALACAK-TUTAR > 0
+       MOVE WS-TEMP-TUTAR TO WS-ALACAK-TUTAR
+    END-IF
+    IF WS-BORC-TUTAR > 0
+       MOVE WS-TEMP-TUTAR TO WS-BORC-TUTAR
+    END-IF
+  END-IF.
+
+
+
+*  IF GMU-KDV OF D-HESPLAN = "H"
+*     IF IN-HESAP-REF-NO(I-SAY) = GMU-KDV-HESAP-REF-NO
+*       MOVE 1 TO WS-KDV-HESAP-ADET
+*     END-IF
+*     IF I-SAY = IN-FIS-DETAY-ADET
+*        IF WS-KDV-HESAP-ADET = 0
+*           MOVE "5921"    TO WS-RESPONSE-CODE
+*           STRING "GELÝR HESABININ KDV'SÝ HARÝÇ OLDUÐU ÝÇÝN "
+*           DELIMITED BY SIZE
+*           "KDV HESABI VE TUTARINI GÝRMEYÝ UNUTMAYINIZ!"
+*           DELIMITED BY SIZE INTO WS-HATA-MESAJI
+*           MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+*           MOVE "7A"      TO WS-RESPONSE-COUNTER
+*           PERFORM HATA-VER
+*           GO TO D70-1-KDV-KONTROL-EXIT
+*        END-IF
+*     END-IF
+*  END-IF.
+
+*  IF GMU-KDV OF D-HESPLAN = "D"
+*     IF IN-BORC-TUTAR(I-SAY) > 0
+*        MOVE IN-BORC-TUTAR(I-SAY) TO WS-TEMP-TUTAR
+*     END-IF
+*     IF IN-ALACAK-TUTAR(I-SAY) > 0
+*        MOVE IN-ALACAK-TUTAR(I-SAY) TO WS-TEMP-TUTAR
+*     END-IF
+*     COMPUTE WS-KESILEN-KDV ROUNDED =
+*      (WS-TEMP-TUTAR * GMU-KDV-ORAN OF D-HESPLAN)/
+*      (100 + GMU-KDV-ORAN OF D-HESPLAN)
+*     COMPUTE WS-TEMP-TUTAR = WS-TEMP-TUTAR - WS-KESILEN-KDV
+*     IF IN-BORC-TUTAR(I-SAY) > 0
+*        MOVE WS-KESILEN-KDV TO IN-BORC-TUTAR(I-SAY)
+*     END-IF
+*     IF IN-ALACAK-TUTAR(I-SAY) > 0
+*        MOVE WS-KESILEN-KDV TO IN-ALACAK-TUTAR(I-SAY)
+*     END-IF
+*  END-IF
+
+** IF GMU-KDV OF D-HESPLAN = "H"
+**    IF IN-BORC-TUTAR(I-SAY) > 0
+**       MOVE IN-BORC-TUTAR(I-SAY) TO WS-TEMP-TUTAR
+**    END-IF
+**    IF IN-ALACAK-TUTAR(I-SAY) > 0
+**       MOVE IN-ALACAK-TUTAR(I-SAY) TO WS-TEMP-TUTAR
+**    END-IF
+**    COMPUTE WS-KESILEN-KDV ROUNDED =
+**     (WS-TEMP-TUTAR * GMU-KDV-ORAN OF D-HESPLAN)/ 100
+**    COMPUTE WS-TEMP-TUTAR = WS-TEMP-TUTAR + WS-KESILEN-KDV
+**    IF IN-BORC-TUTAR(I-SAY) > 0
+**       MOVE WS-TEMP-TUTAR TO IN-BORC-TUTAR(I-SAY)
+**    END-IF
+**    IF IN-ALACAK-TUTAR(I-SAY) > 0
+**       MOVE WS-TEMP-TUTAR TO IN-ALACAK-TUTAR(I-SAY)
+**    END-IF
+** END-IF
+
+*   MOVE IN-HESAP-REF-NO(I-SAY) TO WS-TEMP-REF-NO
+
+*   IF OK-MSG = 0 AND GMU-KDV OF D-HESPLAN = "D"
+*      MOVE GMU-KDV-HESAP-REF-NO OF D-HESPLAN TO IN-HESAP-REF-NO(I-SAY)
+*      PERFORM E80-FIS-DETAY
+*        IF OK-MSG = 0
+*           PERFORM E90-UPDATE-OZETHES
+*        END-IF
+*   END-IF.
+
+*   IF OK-MSG = 0 AND GMU-KDV OF D-HESPLAN = "D"
+*      MOVE WS-TEMP-REF-NO TO IN-HESAP-REF-NO(I-SAY)
+*      IF IN-BORC-TUTAR(I-SAY) > 0
+*         MOVE WS-TEMP-TUTAR TO IN-BORC-TUTAR(I-SAY)
+*      END-IF
+*      IF IN-ALACAK-TUTAR(I-SAY) > 0
+*         MOVE WS-TEMP-TUTAR TO IN-ALACAK-TUTAR(I-SAY)
+*      END-IF
+*   END-IF.
+
+ E20-1-KDV-HESAPLA-EXIT.
+     EXIT.
+*******************************************************************************
+ E30-FIS-ISLEMLERI-DEVAM SECTION.
+
+     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+        PERFORM E40-FIS-TUTAR-KONTROL
+     END-IF
+     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+        PERFORM E50-FIS-DETAY
+     END-IF
+     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+        PERFORM E60-UPDATE-OZETHES
+     END-IF
+     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+        IF GMU-YRD-KART-DURUMU OF D-HESPLAN = "E"
+           PERFORM E70-UPDATE-YRD-OZETHES
+        END-IF
+     END-IF
+
+     IF OK-MSG = 0 AND OK-MSG-ENT = 0
+        IF IOSUBE-NO OF D-OZET EQUAL 99
+        OR (IOMERKEZ-NO OF D-OZET >= 40000 AND
+                   IOMERKEZ-NO OF D-OZET <= 41000 )
+*          IF NOT (WS-HESAP-REF-NO = S-BSMV-HESAP-740 OR
+*                  WS-HESAP-REF-NO = S-BSMV-HESAP-360)
+                   COMPUTE WS-TOPLAM-BORC-TUTAR   = WS-TOPLAM-BORC-TUTAR +
+                                                    WS-BORC-TUTAR
+                   COMPUTE WS-TOPLAM-ALACAK-TUTAR = WS-TOPLAM-ALACAK-TUTAR +
+                                                    WS-ALACAK-TUTAR
+*          ELSE
+*             CONTINUE
+*          END-IF
+        ELSE
+           COMPUTE WS-TOPLAM-BORC-TUTAR   = WS-TOPLAM-BORC-TUTAR   +
+                                            WS-BORC-TUTAR
+           COMPUTE WS-TOPLAM-ALACAK-TUTAR = WS-TOPLAM-ALACAK-TUTAR +
+                                            WS-ALACAK-TUTAR
+        END-IF
+     END-IF.
+
+ E30-FIS-ISLEMLERI-DEVAM-EXIT.
+       EXIT.
+*******************************************************************************
+ E40-FIS-TUTAR-KONTROL SECTION.
+
+    IF WS-BORC-TUTAR = 0 AND WS-ALACAK-TUTAR = 0
+       MOVE "5921"    TO WS-RESPONSE-CODE
+       STRING "FÝÞ TUTARI SIFIRDAN FARKLI OLMALI!"
+       DELIMITED BY SIZE INTO WS-HATA-MESAJI
+       MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+       MOVE "39"      TO WS-RESPONSE-COUNTER
+       PERFORM HATA-VER-WORK
+    END-IF.
+
+    IF WS-BORC-TUTAR > 0 AND WS-ALACAK-TUTAR > 0
+       PERFORM Z-HESAP-NO-BUL
+       MOVE "5921"    TO WS-RESPONSE-CODE
+       STRING WS-SHESNO-HESAP-NO  DELIMITED BY SPACE
+       " HESABI HEM BORÇ HEM ALACAK ÇALIÞAMAZ!"
+       DELIMITED BY SIZE INTO WS-HATA-MESAJI
+       MOVE "WARNING" TO WS-HATA-MESAJI-TIPI
+       MOVE "40"      TO WS-RESPONSE-COUNTER
+       PERFORM HATA-VER-WORK
+    END-IF.
+
+ E40-FIS-TUTAR-KONTROL-EXIT.
+         EXIT.
+******************************************************************************
+ E50-FIS-DETAY SECTION.
+
+   MOVE "SFISDET"                 TO WS-HATA-SUBPROG-NAME
+   MOVE WS-KURULUS-KODU           TO WS-SFISDET-KURULUS-KODU
+
+   IF IOSUBE-NO OF D-OZET = 99 OR IOSUBE-NO OF D-OZET = 2
+      IF WS-ILKMI = 1 AND NOT WS-YENI-SUBE-FLAG
+         MOVE ENT-BOLGE-KODU OF D-ENTEG  TO WS-SFISDET-BOLGE-KODU
+         MOVE ENT-MERKEZ-NO  OF D-ENTEG  TO WS-SFISDET-MERKEZ-NO
+      ELSE
+         MOVE S-ONCEKI-ENTEG-BOLGE-KODU  TO WS-SFISDET-BOLGE-KODU
+         MOVE S-ONCEKI-ENTEG-MERKEZ-NO   TO WS-SFISDET-MERKEZ-NO
+      END-IF
+   ELSE
+      MOVE ENT-BOLGE-KODU OF D-ENTEG  TO WS-SFISDET-BOLGE-KODU
+      MOVE ENT-MERKEZ-NO  OF D-ENTEG  TO WS-SFISDET-MERKEZ-NO
+   END-IF
+   MOVE 0                         TO WS-SFISDET-SUBE-NO
+   MOVE 1                         TO WS-SFISDET-GISE-NO
+   MOVE WS-ISLEM-YIL              TO WS-SFISDET-ISLEM-YIL
+   MOVE WS-ISLEM-AY               TO WS-SFISDET-ISLEM-AY
+   MOVE WS-ISLEM-GUN              TO WS-SFISDET-ISLEM-GUN
+   MOVE WS-FIS-TURU               TO WS-SFISDET-FIS-TURU
+
+   MOVE FUNCTION CURRENT-DATE(1:8) TO WS-CURRENT-DATE
+
+   MOVE WS-SEFSIRA-SIRA-NO TO WS-SFISDET-FIS-NO
+
+   IF WS-SFISDET-SIRA-NO EQUAL WS-ONCEKI-FIS-SIRA-NO AND
+      WS-SFISDET-FIS-TURU EQUAL WS-ONCEKI-FIS-TURU
+      ADD  1 TO WS-DETAY-SIRA-NO
+   ELSE
+      MOVE 1 TO WS-DETAY-SIRA-NO
+   END-IF.
+
+   MOVE WS-HESAP-REF-NO              TO WS-SFISDET-HESAP-REF-NO
+   MOVE WS-FIS-ACIKLAMA              TO WS-SFISDET-FIS-ACIKLAMA
+   MOVE WS-DETAY-SIRA-NO             TO WS-SFISDET-SIRA-NO
+   MOVE GMU-DGT-TIPI OF D-HESPLAN    TO WS-SFISDET-DGT-TIPI
+   MOVE WS-DGT-KODU                  TO WS-SFISDET-DGT-KODU
+*  IF NOT (ENT-ISLEM-TIPI OF D-ENTEG = 5 OR ENT-ISLEM-TIPI OF D-ENTEG = 6)
+*77777 sicil ile gelen veri icin kart olusmayacak bu yuzden burada space yaz.
+   IF NOT WS-YENI-SUBE-FLAG or  GMU-YRD-KART-NO   OF D-YRDKART (1:6) = "777777"
+                            OR  GMU-YRD-KART-NO   OF D-YRDKART (1:6) = "777776"
+                                                        OR  GMU-YRD-KART-NO   OF D-YRDKART (1:6) = "999998"
+      MOVE SPACE                     TO WS-SFISDET-YRD-KART-NO
+      MOVE SPACE                     TO WS-SFISDET-YRD-KART-TIPI
+   ELSE
+      MOVE GMU-YRD-KART-NO   OF D-YRDKART TO WS-SFISDET-YRD-KART-NO
+      MOVE GMU-YRD-KART-TIPI OF D-YRDKART TO WS-SFISDET-YRD-KART-TIPI
+   END-IF
+   MOVE WS-BORC-TUTAR                TO WS-SFISDET-BORC-TUTAR
+   MOVE WS-ALACAK-TUTAR              TO WS-SFISDET-ALACAK-TUTAR
+   MOVE SPACE                        TO WS-SFISDET-KARSI-DGT-TIPI
+   MOVE SPACE                        TO WS-SFISDET-KARSI-DGT-KODU
+   MOVE WS-DOVIZ-KURU                TO WS-SFISDET-KUR
+   MOVE WS-DOVIZ-MIKTAR              TO WS-SFISDET-DOVIZ-MIKTAR
+   MOVE WS-ODEME-KODU                TO WS-SFISDET-ODEME-KODU
+** MOVE GMU-ODEME-KODU OF D-HESPLAN  TO WS-SFISDET-ODEME-KODU
+** MOVE ENT-DOVIZ-CINSI OF D-ENTEG   TO WS-SFISDET-ODEME-KODU
+   MOVE 1                            TO WS-SFISDET-FIS-STATUS
+   MOVE 999888                       TO WS-SFISDET-EKL-SICIL-NO
+
+   MOVE WS-SFISDET-SIRA-NO  TO WS-ONCEKI-FIS-SIRA-NO
+   MOVE WS-SFISDET-FIS-TURU TO WS-ONCEKI-FIS-TURU
+
+  CALL "SFISDET" USING WS-SFISDET-KURULUS-KODU, WS-SFISDET-BOLGE-KODU,
+                       WS-SFISDET-MERKEZ-NO, WS-SFISDET-SUBE-NO,
+                       WS-SFISDET-GISE-NO,   WS-SFISDET-ISLEM-YIL,
+                       WS-SFISDET-ISLEM-AY,  WS-SFISDET-ISLEM-GUN,
+                       WS-SFISDET-FIS-TURU,  WS-SFISDET-FIS-NO,
+                       WS-SFISDET-HESAP-REF-NO, WS-SFISDET-FIS-ACIKLAMA,
+                       WS-SFISDET-SIRA-NO, WS-SFISDET-DGT-TIPI,
+                       WS-SFISDET-DGT-KODU, WS-SFISDET-YRD-KART-NO,
+                       WS-SFISDET-YRD-KART-TIPI, WS-SFISDET-BORC-TUTAR,
+                       WS-SFISDET-ALACAK-TUTAR, WS-SFISDET-KARSI-DGT-TIPI,
+                       WS-SFISDET-KARSI-DGT-KODU, WS-SFISDET-KUR,
+                       WS-SFISDET-DOVIZ-MIKTAR  , WS-SFISDET-ODEME-KODU,
+                       WS-SFISDET-FIS-STATUS, WS-SFISDET-EKL-SICIL-NO,
+                       WS-SFISDET-KONTROL-FLAG, WS-SFISDET-HATA-MESAJI,
+                       WS-SFISDET-SQL-ERR,    WS-SFISDET-SYS-ERR.
+   IF WS-SFISDET-SQL-ERR NOT EQUAL 0
+     MOVE "5930"                 TO WS-RESPONSE-CODE
+     MOVE "41"                   TO WS-RESPONSE-COUNTER
+     MOVE "WARNING"              TO WS-HATA-MESAJI-TIPI
+     MOVE WS-SFISDET-HATA-MESAJI TO WS-HATA-MESAJI
+     MOVE WS-SFISDET-SQL-ERR TO SQLCODE OF SQLCA
+     MOVE WS-SFISDET-SYS-ERR TO ERRCODE OF SQL-ERROR OF SQLCA(2)
+     PERFORM HATA-VER-WORK
+  ELSE
+     IF WS-SFISDET-KONTROL-FLAG = "OK"
+        CONTINUE
+     ELSE
+        MOVE "5921"                       TO WS-RESPONSE-CODE
+        MOVE "42"                         TO WS-RESPONSE-COUNTER
+        MOVE "WARNING"                    TO WS-HATA-MESAJI-TIPI
+        MOVE WS-SFISDET-HATA-MESAJI TO WS-HATA-MESAJI
+        MOVE WS-SFISDET-SQL-ERR TO SQLCODE OF SQLCA
+        MOVE WS-SFISDET-SYS-ERR TO ERRCODE OF SQL-ERROR OF SQLCA(2)
+        PERFORM HATA-VER-WORK
+      END-IF
+   END-IF.
+
+  E50-FIS-DETAY-EXIT.
+      EXIT.
+*****************************************************************************
+  E60-UPDATE-OZETHES SECTION.
+
+   MOVE "SENTHES"                   TO WS-HATA-SUBPROG-NAME
+   MOVE WS-KURULUS-KODU             TO WS-SOZTHES-KURULUS-KODU
+   IF IOSUBE-NO OF D-OZET = 99 OR IOSUBE-NO OF D-OZET = 2
+      IF WS-ILKMI = 1 AND NOT WS-YENI-SUBE-FLAG
+         MOVE ENT-BOLGE-KODU OF D-ENTEG  TO WS-SOZTHES-BOLGE-KODU
+         MOVE ENT-MERKEZ-NO  OF D-ENTEG  TO WS-SOZTHES-MERKEZ-NO
+      ELSE
+         MOVE S-ONCEKI-ENTEG-BOLGE-KODU  TO WS-SOZTHES-BOLGE-KODU
+         MOVE S-ONCEKI-ENTEG-MERKEZ-NO   TO WS-SOZTHES-MERKEZ-NO
+      END-IF
+   ELSE
+      MOVE ENT-BOLGE-KODU OF D-ENTEG  TO WS-SOZTHES-BOLGE-KODU
+      MOVE ENT-MERKEZ-NO  OF D-ENTEG  TO WS-SOZTHES-MERKEZ-NO
+   END-IF
+   MOVE 0                       TO WS-SOZTHES-SUBE-NO
+   MOVE 1                       TO WS-SOZTHES-GISE-NO
+   MOVE S-ISLEM-YY              TO WS-SOZTHES-ISLEM-YIL
+   MOVE S-ISLEM-MM              TO WS-SOZTHES-ISLEM-AY
+   MOVE S-ISLEM-DD              TO WS-SOZTHES-ISLEM-GUN
+   MOVE WS-HESAP-REF-NO         TO WS-SOZTHES-HESAP-REF-NO
+   MOVE WS-FIS-TURU             TO WS-SOZTHES-FIS-TURU
+   MOVE WS-BORC-TUTAR           TO WS-SOZTHES-BORC-TUTAR
+   MOVE WS-ALACAK-TUTAR         TO WS-SOZTHES-ALACAK-TUTAR
+   MOVE 999888                  TO WS-SOZTHES-SICIL-NO
+
+  INITIALIZE WS-SOZTHES-SYS-ERR, WS-SOZTHES-SQL-ERR, WS-SOZTHES-KONTROL-FLAG
+  CALL "SENTHES" USING WS-SOZTHES-KURULUS-KODU, WS-SOZTHES-BOLGE-KODU,
+                       WS-SOZTHES-MERKEZ-NO, WS-SOZTHES-SUBE-NO,
+                       WS-SOZTHES-GISE-NO, WS-SOZTHES-ISLEM-YIL,
+                       WS-SOZTHES-ISLEM-AY, WS-SOZTHES-ISLEM-GUN,
+                       WS-SOZTHES-HESAP-REF-NO, WS-SOZTHES-FIS-TURU,
+                       WS-SOZTHES-BORC-TUTAR, WS-SOZTHES-ALACAK-TUTAR,
+                       WS-SOZTHES-SICIL-NO, WS-SOZTHES-KONTROL-FLAG,
+                       WS-SOZTHES-SQL-ERR, WS-SOZTHES-SYS-ERR.
+  IF WS-SOZTHES-SQL-ERR NOT EQUAL 0
+        MOVE "5921"                       TO WS-RESPONSE-CODE
+        MOVE "43"                         TO WS-RESPONSE-COUNTER
+        MOVE "WARNING"                    TO WS-HATA-MESAJI-TIPI
+        STRING "SOZTHES SUBPROGRAMI HATALI BÝTTÝ,YETKÝLÝLERE HABER VERÝNÝZ!"
+        DELIMITED BY SIZE  INTO WS-HATA-MESAJI
+        MOVE WS-SOZTHES-SQL-ERR TO SQLCODE OF SQLCA
+        MOVE WS-SOZTHES-SYS-ERR TO ERRCODE OF SQL-ERROR OF SQLCA(2)
+        PERFORM HATA-VER-WORK
+  ELSE
+     IF WS-SOZTHES-KONTROL-FLAG = "OK"
+        CONTINUE
+     ELSE
+        MOVE "5921"                       TO WS-RESPONSE-CODE
+        MOVE "44"                         TO WS-RESPONSE-COUNTER
+        MOVE "WARNING"                    TO WS-HATA-MESAJI-TIPI
+        STRING "SENTHES SUBPROGRAMI HATALI BÝTTÝ,YETKÝLÝLERE HABER VERÝNÝZ!"
+        DELIMITED BY SIZE  INTO WS-HATA-MESAJI
+        MOVE WS-SOZTHES-SQL-ERR TO SQLCODE OF SQLCA
+        MOVE WS-SOZTHES-SYS-ERR TO ERRCODE OF SQL-ERROR OF SQLCA(2)
+        PERFORM HATA-VER-WORK
+     END-IF
+  END-IF.
+
+ E60-UPDATE-OZETHES-EXIT.
+       EXIT.
+****************************************************************************
+ E70-UPDATE-YRD-OZETHES SECTION.
+
+   MOVE "SENTYHS"                   TO WS-HATA-SUBPROG-NAME
+   MOVE WS-KURULUS-KODU             TO WS-SENTYHS-KURULUS-KODU
+   IF IOSUBE-NO OF D-OZET = 99 OR IOSUBE-NO OF D-OZET = 2
+      IF WS-ILKMI = 1 AND NOT WS-YENI-SUBE-FLAG
+         MOVE ENT-BOLGE-KODU OF D-ENTEG  TO WS-SENTYHS-BOLGE-KODU
+         MOVE ENT-MERKEZ-NO  OF D-ENTEG  TO WS-SENTYHS-MERKEZ-NO
+      ELSE
+         MOVE S-ONCEKI-ENTEG-BOLGE-KODU  TO WS-SENTYHS-BOLGE-KODU
+         MOVE S-ONCEKI-ENTEG-MERKEZ-NO   TO WS-SENTYHS-MERKEZ-NO
+      END-IF
+   ELSE
+      MOVE ENT-BOLGE-KODU OF D-ENTEG  TO WS-SENTYHS-BOLGE-KODU
+      MOVE ENT-MERKEZ-NO  OF D-ENTEG  TO WS-SENTYHS-MERKEZ-NO
+   END-IF
+   MOVE 0                        TO WS-SENTYHS-SUBE-NO
+   MOVE 1                        TO WS-SENTYHS-GISE-NO
+   MOVE S-ISLEM-YY               TO WS-SENTYHS-ISLEM-YIL
+   MOVE S-ISLEM-MM               TO WS-SENTYHS-ISLEM-AY
+   MOVE S-ISLEM-DD               TO WS-SENTYHS-ISLEM-GUN
+   MOVE WS-HESAP-REF-NO          TO WS-SENTYHS-HESAP-REF-NO
+   MOVE WS-SFISDET-YRD-KART-NO   TO WS-SENTYHS-YRD-KART-NO
+   MOVE WS-SFISDET-YRD-KART-TIPI TO WS-SENTYHS-YRD-KART-TIPI
+   MOVE WS-BORC-TUTAR            TO WS-SENTYHS-BORC-TUTAR
+   MOVE WS-ALACAK-TUTAR          TO WS-SENTYHS-ALACAK-TUTAR
+   MOVE 999888                   TO WS-SENTYHS-SICIL-NO
+
+  INITIALIZE WS-SENTYHS-SYS-ERR, WS-SENTYHS-SQL-ERR, WS-SENTYHS-KONTROL-FLAG
+  CALL "SENTYHS" USING WS-SENTYHS-KURULUS-KODU,   WS-SENTYHS-BOLGE-KODU,
+                       WS-SENTYHS-MERKEZ-NO,      WS-SENTYHS-SUBE-NO,
+                       WS-SENTYHS-GISE-NO,        WS-SENTYHS-ISLEM-YIL,
+                       WS-SENTYHS-ISLEM-AY,       WS-SENTYHS-ISLEM-GUN,
+                       WS-SENTYHS-HESAP-REF-NO,   WS-SENTYHS-YRD-KART-NO,
+                       WS-SENTYHS-YRD-KART-TIPI, WS-SENTYHS-BORC-TUTAR,
+                       WS-SENTYHS-ALACAK-TUTAR,   WS-SENTYHS-SICIL-NO,
+                       WS-SENTYHS-KONTROL-FLAG,   WS-SENTYHS-SQL-ERR,
+                       WS-SENTYHS-SYS-ERR.
+  IF WS-SENTYHS-SQL-ERR NOT EQUAL 0
+        MOVE "5921"                       TO WS-RESPONSE-CODE
+        MOVE "43"                         TO WS-RESPONSE-COUNTER
+        MOVE "WARNING"                    TO WS-HATA-MESAJI-TIPI
+        STRING "SENTYHS SUBPROGRAMI HATALI BÝTTÝ,YETKÝLÝLERE HABER VERÝNÝZ!"
+        DELIMITED BY SIZE  INTO WS-HATA-MESAJI
+        MOVE WS-SENTYHS-SQL-ERR TO SQLCODE OF SQLCA
+        MOVE WS-SENTYHS-SYS-ERR TO ERRCODE OF SQL-ERROR OF SQLCA(2)
+        PERFORM HATA-VER-WORK
+  ELSE
+     IF WS-SENTYHS-KONTROL-FLAG = "OK"
+        CONTINUE
+     ELSE
+        MOVE "5921"                       TO WS-RESPONSE-CODE
+        MOVE "44"                         TO WS-RESPONSE-COUNTER
+        MOVE "WARNING"                    TO WS-HATA-MESAJI-TIPI
+        STRING "SENTYHS SUBPROGRAMI HATALI BÝTTÝ,YETKÝLÝLERE HABER VERÝNÝZ!"
+        DELIMITED BY SIZE  INTO WS-HATA-MESAJI
+        MOVE WS-SENTYHS-SQL-ERR TO SQLCODE OF SQLCA
+        MOVE WS-SENTYHS-SYS-ERR TO ERRCODE OF SQL-ERROR OF SQLCA(2)
+        PERFORM HATA-VER-WORK
+     END-IF
+  END-IF.
+
+ E70-UPDATE-YRD-OZETHES-EXIT.
+       EXIT.
+****************************************************************************
+
+* E50-DAGITIM-DEVIR SECTION.
+*
+*   MOVE "SDGTM"                   TO WS-HATA-SUBPROG-NAME
+*   MOVE WS-KURULUS-KODU           TO WS-SDGTM-KURULUS-KODU
+*   IF IOSUBE-NO OF D-OZET = 99 OR IOSUBE-NO OF D-OZET = 2
+*      IF WS-ILKMI = 1 AND NOT WS-YENI-SUBE-FLAG
+*         MOVE ENT-BOLGE-KODU OF D-ENTEG  TO WS-SDGTM-BOLGE-KODU
+*         MOVE ENT-MERKEZ-NO  OF D-ENTEG  TO WS-SDGTM-MERKEZ-NO
+*      ELSE
+*         MOVE S-ONCEKI-ENTEG-BOLGE-KODU  TO WS-SDGTM-BOLGE-KODU
+*         MOVE S-ONCEKI-ENTEG-MERKEZ-NO   TO WS-SDGTM-MERKEZ-NO
+*      END-IF
+*   ELSE
+*      MOVE ENT-BOLGE-KODU OF D-ENTEG  TO WS-SDGTM-BOLGE-KODU
+*      MOVE ENT-MERKEZ-NO  OF D-ENTEG  TO WS-SDGTM-MERKEZ-NO
+*   END-IF
+*   MOVE 0                         TO WS-SDGTM-SUBE-NO
+*   MOVE 555                       TO WS-SDGTM-GISE-NO
+*   MOVE WS-ISLEM-YIL              TO WS-SDGTM-ISLEM-YIL
+*   MOVE WS-ISLEM-AY               TO WS-SDGTM-ISLEM-AY
+*   MOVE WS-ISLEM-GUN              TO WS-SDGTM-ISLEM-GUN
+*   MOVE WS-HESAP-REF-NO           TO WS-SDGTM-HESAP-REF-NO
+*   MOVE WS-FIS-TURU               TO WS-SDGTM-FIS-TURU
+*   MOVE GMU-DGT-TIPI OF D-HESPLAN TO WS-SDGTM-DGT-TIPI
+*   MOVE WS-DGT-KODU               TO WS-SDGTM-DGT-KODU
+*   IF WS-BORC-TUTAR > WS-ALACAK-TUTAR
+*      MOVE WS-BORC-TUTAR          TO WS-SDGTM-TUTAR
+*   ELSE
+*      MOVE WS-ALACAK-TUTAR        TO WS-SDGTM-TUTAR
+*   END-IF
+*   MOVE 999888           TO WS-SDGTM-SICIL-NO
+*
+*  INITIALIZE WS-SDGTM-SYS-ERR, WS-SDGTM-SQL-ERR, WS-SDGTM-KONTROL-FLAG
+*  CALL "SDGTM"  USING WS-SDGTM-KURULUS-KODU, WS-SDGTM-BOLGE-KODU,
+*                      WS-SDGTM-MERKEZ-NO, WS-SDGTM-SUBE-NO,
+*                      WS-SDGTM-GISE-NO, WS-SDGTM-ISLEM-YIL,
+*                      WS-SDGTM-ISLEM-AY, WS-SDGTM-ISLEM-GUN,
+*                      WS-SDGTM-HESAP-REF-NO, WS-SDGTM-FIS-TURU,
+*                      WS-SDGTM-DGT-TIPI, WS-SDGTM-DGT-KODU,
+*                      WS-SDGTM-TUTAR, WS-SDGTM-SICIL-NO,
+*                      WS-SDGTM-KONTROL-FLAG, WS-SDGTM-SQL-ERR,
+*                      WS-SDGTM-SYS-ERR.
+*  IF WS-SDGTM-SQL-ERR NOT EQUAL 0
+*       MOVE "5921"                       TO WS-RESPONSE-CODE
+*        MOVE "45"                         TO WS-RESPONSE-COUNTER
+*        MOVE "WARNING"                    TO WS-HATA-MESAJI-TIPI
+*        STRING "SDGTM SUBPROGRAMI HATALI BÝTTÝ,YETKÝLÝLERE HABER VERÝNÝZ!"
+*        DELIMITED BY SIZE  INTO WS-HATA-MESAJI
+*        MOVE WS-SDGTM-SQL-ERR TO SQLCODE OF SQLCA
+*        MOVE WS-SDGTM-SYS-ERR TO ERRCODE OF SQL-ERROR OF SQLCA(2)
+*        PERFORM HATA-VER-WORK
+*  ELSE
+*     IF WS-SDGTM-KONTROL-FLAG = "OK"
+*        CONTINUE
+*     ELSE
+*        MOVE "5921"                       TO WS-RESPONSE-CODE
+*        MOVE "46"                         TO WS-RESPONSE-COUNTER
+*        MOVE "WARNING"                    TO WS-HATA-MESAJI-TIPI
+*        STRING "SDGTM SUBPROGRAMI HATALI BÝTTÝ,YETKÝLÝLERE HABER VERÝNÝZ!"
+*        DELIMITED BY SIZE  INTO WS-HATA-MESAJI
+*        MOVE WS-SDGTM-SQL-ERR TO SQLCODE OF SQLCA
+*        MOVE WS-SDGTM-SYS-ERR TO ERRCODE OF SQL-ERROR OF SQLCA(2)
+*        PERFORM HATA-VER-WORK
+*     END-IF
+*  END-IF.
+*
+* E50-DAGITIM-DEVIR-EXIT.
+*    EXIT.
+******************************************************************************
+ Z-HESAP-NO-BUL SECTION.
+
+  MOVE "SHESNO"           TO WS-HATA-SUBPROG-NAME
+  MOVE WS-KURULUS-KODU   TO WS-SHESNO-KURULUS-KODU
+  MOVE WS-HESAP-REF-NO    TO WS-SHESNO-HES-REF-NO
+
+  INITIALIZE WS-SHESNO-SYS-ERR, WS-SHESNO-SQL-ERR, WS-SHESNO-HESAP-NO
+  CALL "SHESNO" USING WS-SHESNO-KURULUS-KODU, WS-SHESNO-HES-REF-NO,
+                      WS-SHESNO-HESAP-NO, WS-SHESNO-SQL-ERR,
+                      WS-SHESNO-SYS-ERR.
+
+  IF WS-SHESNO-SQL-ERR NOT EQUAL 0
+        MOVE "5921"                       TO WS-RESPONSE-CODE
+        MOVE "47"                         TO WS-RESPONSE-COUNTER
+        MOVE "WARNING"                    TO WS-HATA-MESAJI-TIPI
+        STRING "SHESNO SUBPROGRAMI HATALI BÝTTÝ,YETKÝLÝLERE HABER VERÝNÝZ!"
+        DELIMITED BY SIZE  INTO WS-HATA-MESAJI
+        MOVE WS-SHESNO-SQL-ERR TO SQLCODE OF SQLCA
+        MOVE WS-SHESNO-SYS-ERR TO ERRCODE OF SQL-ERROR OF SQLCA(2)
+        PERFORM HATA-VER-WORK
+  ELSE
+     CONTINUE
+  END-IF.
+
+ Z-HESAP-NO-BUL-EXIT.
+         EXIT.
+******************************************************************************
+ HATA-VER-WORK SECTION.
+
+  MOVE 1 TO OK-MSG-ENT, OK-MSG
+  IF WS-KAYITVAR-FLAG = 1
+     SET WS-BASARISIZ-FLAG TO TRUE
+  END-IF
+  SET WS-TRANSACTION-BITIR-FLAG TO TRUE
+  IF WS-CURSOR-ACIK-FLAG
+     EXEC SQL CLOSE SELECT_MFYS END-EXEC
+  END-IF.
+  INITIALIZE WS-HATA-MESAJI
+
+*-----------------------------------------*
+     EXEC SQL ROLLBACK WORK END-EXEC.
+*-----------------------------------------*
+
+     EVALUATE WS-HATA-MESAJI-TIPI
+        WHEN "NOT-FOUND"
+         STRING WS-HATA-TABLE-NAME " TABLOSUNDA KAYIT BULUNAMADI!"
+         DELIMITED BY SIZE INTO WS-HATA-MESAJI
+        WHEN "DUPLICATE"
+         STRING WS-HATA-TABLE-NAME " TABLOSUNDA MUKERRER KAYIT VAR!"
+         DELIMITED BY SIZE INTO WS-HATA-MESAJI
+*       WHEN "NONNUMERIC"
+*        STRING WS-HATA-TABLE-NAME " TABLOSUNDA SAYISAL ALANA KARAKTER GELDI!"
+*        DELIMITED BY SIZE INTO WS-HATA-MESAJI
+*       WHEN "COULD-NOT-OPEN"
+*        STRING WS-HATA-CURSOR-NAME " CURSORU ACILAMADI!"
+*        DELIMITED BY SIZE INTO WS-HATA-MESAJI
+*       WHEN "COULD-NOT-UPDATE"
+*        STRING WS-HATA-TABLE-NAME " TABLOSU UPDATE EDILEMEDI!"
+*        DELIMITED BY SIZE INTO WS-HATA-MESAJI
+        WHEN "COULD-NOT-INSERT"
+         STRING WS-HATA-TABLE-NAME " TABLOSUNA KAYIT EKLENEMEDI!"
+         DELIMITED BY SIZE INTO WS-HATA-MESAJI
+        WHEN "OTHER"
+     display "-------------------------------------"
+     display " islem-turu : " islem-turu of d-islemtur
+     display "-------------------------------------"
+     DISPLAY " HESAP-REF-NO : " GMU-HESAP-REF-NO OF D-HESPLAN
+         STRING WS-HATA-TABLE-NAME " TABLOSUNDA HATA VAR!"
+         DELIMITED BY SIZE INTO WS-HATA-MESAJI
+        display "sqlcode :" sqlcode of sqlca
+        display "merkez-no " iomerkez-no of d-ozet
+        WHEN "WARNING"
+         CONTINUE
+        WHEN OTHER
+         MOVE " " TO WS-HATA-MESAJI
+     END-EVALUATE.
+
+     DISPLAY "*************************************************************"
+     DISPLAY " HATA !:" WS-HATA-MESAJI
+     DISPLAY "*************************************************************".
+
+*    INITIALIZE D-ERRLOG
+*
+*    MOVE WS-KURULUS-KODU TO KURULUS-KODU OF D-ERRLOG
+*    MOVE S-ISLEM-YY                       TO ERR-ISLEM-YIL   OF D-ERRLOG
+*    MOVE S-ISLEM-MM                       TO ERR-ISLEM-AY    OF D-ERRLOG
+*    MOVE S-ISLEM-DD                       TO ERR-ISLEM-GUN   OF D-ERRLOG
+*    MOVE BOLGE-KODU  OF D-PTTMRK          TO ERR-BOLGE-KODU  OF D-ERRLOG
+*    MOVE IOMERKEZ-NO OF D-OZET            TO ERR-MERKEZ-NO   OF D-ERRLOG
+*    MOVE IOSUBE-NO   OF D-OZET            TO ERR-SUBE-NO     OF D-ERRLOG
+*    MOVE IOGISE-NO   OF D-OZET            TO ERR-GISE-NO     OF D-ERRLOG
+*    MOVE "$DATA18.MUHWRK.ENT01SC"         TO ERR-SOURCE-CODE OF D-ERRLOG
+*    MOVE SQLCODE OF SQLCA                 TO ERR-SQL-ERR     OF D-ERRLOG
+*    MOVE ERRCODE OF SQL-ERROR OF SQLCA(2) TO ERR-SYS-ERR     OF D-ERRLOG
+*    MOVE WS-HATA-MESAJI-TIPI              TO ERR-MESAJ-TIPI  OF D-ERRLOG
+*    MOVE WS-RESPONSE-CODE                 TO ERR-RES-CODE    OF D-ERRLOG
+*    MOVE WS-RESPONSE-COUNTER              TO ERR-RES-COUNTER OF D-ERRLOG
+*    MOVE WS-HATA-MESAJI                   TO ERR-HATA-MESAJI OF D-ERRLOG
+*    MOVE FUNCTION CURRENT-DATE(1:4)       TO ERR-SISTEM-YIL  OF D-ERRLOG
+*    MOVE FUNCTION CURRENT-DATE(5:2)       TO ERR-SISTEM-AY   OF D-ERRLOG
+*    MOVE FUNCTION CURRENT-DATE(7:2)       TO ERR-SISTEM-GUN  OF D-ERRLOG
+*    MOVE FUNCTION CURRENT-DATE(9:8)       TO ERR-SISTEM-SAAT OF D-ERRLOG
+*
+*        EXEC SQL BEGIN WORK END-EXEC.
+*
+*         EXEC SQL
+*          INSERT INTO $DATA18.MUHTAB.ERRORLOG VALUES (
+*              :KURULUS-KODU    OF D-ERRLOG,
+*              :ERR-ISLEM-YIL   OF D-ERRLOG,
+*              :ERR-ISLEM-AY    OF D-ERRLOG,
+*              :ERR-ISLEM-GUN   OF D-ERRLOG,
+*              :ERR-BOLGE-KODU  OF D-ERRLOG,
+*              :ERR-MERKEZ-NO   OF D-ERRLOG,
+*              :ERR-SUBE-NO     OF D-ERRLOG,
+*              :ERR-GISE-NO     OF D-ERRLOG,
+*              :ERR-SOURCE-CODE OF D-ERRLOG,
+*              :ERR-SQL-ERR     OF D-ERRLOG,
+*              :ERR-SYS-ERR     OF D-ERRLOG,
+*              :ERR-MESAJ-TIPI  OF D-ERRLOG,
+*              :ERR-RES-CODE    OF D-ERRLOG,
+*              :ERR-RES-COUNTER OF D-ERRLOG,
+*              :ERR-HATA-MESAJI OF D-ERRLOG,
+*              :ERR-SISTEM-YIL  OF D-ERRLOG,
+*              :ERR-SISTEM-AY   OF D-ERRLOG,
+*              :ERR-SISTEM-GUN  OF D-ERRLOG,
+*              :ERR-SISTEM-SAAT OF D-ERRLOG)
+*     END-EXEC.
+*
+*     EXEC SQL COMMIT WORK END-EXEC.
+
+** IF WS-CURSOR-ACIK-FLAG
+**    GO TO MARK-MERKEZ-ENT-BITIR
+**    EXIT PERFORM
+** END-IF.
+  HATA-VER-WORK-EXIT.
+     EXIT.
+*******************************************************************************
+ INSERT-SONUC-RAPOR SECTION.
+
+   MOVE 1                                TO KURULUS-KODU OF D-ENTSONUC
+   MOVE S-ISLEM-YY                       TO ISLEM-YIL   OF D-ENTSONUC
+   MOVE S-ISLEM-MM                       TO ISLEM-AY    OF D-ENTSONUC
+   MOVE S-ISLEM-DD                       TO ISLEM-GUN   OF D-ENTSONUC
+   MOVE S-BOLGE-KODU                     TO BOLGE-KODU  OF D-ENTSONUC
+*  MOVE IOMERKEZ-NO OF D-OZET            TO MERKEZ-NO   OF D-ENTSONUC
+   MOVE s-merkez-no                      TO MERKEZ-NO   OF D-ENTSONUC
+   MOVE 99                               TO SUBE-NO     OF D-ENTSONUC
+   MOVE FUNCTION CURRENT-DATE(1:4)       TO SISTEM-YIL  OF D-ENTSONUC
+   MOVE FUNCTION CURRENT-DATE(5:2)       TO SISTEM-AY   OF D-ENTSONUC
+   MOVE FUNCTION CURRENT-DATE(7:2)       TO SISTEM-GUN  OF D-ENTSONUC
+   MOVE FUNCTION CURRENT-DATE(9:8)       TO SISTEM-SAAT OF D-ENTSONUC
+
+   if s-merkez-no = 8813
+   move 50003 to MERKEZ-NO   OF D-ENTSONUC
+   end-if
+
+
+   IF WS-BASARISIZ-FLAG
+      MOVE "NOTOK" TO SONUC OF D-ENTSONUC
+   ELSE
+    IF WS-KAYITVAR-FLAG = 1
+      MOVE "OK"    TO SONUC OF D-ENTSONUC
+    ELSE
+      MOVE "NOTR"  TO SONUC OF D-ENTSONUC
+    END-IF
+   END-IF
+
+   MOVE 0 TO WS-KAYITVAR-FLAG
+
+   EXEC SQL BEGIN WORK END-EXEC.
+
+        EXEC SQL
+          INSERT INTO $DATA18.MUHTAB.ENTSONUC VALUES (
+               :KURULUS-KODU    OF D-ENTSONUC,
+               :ISLEM-YIL       OF D-ENTSONUC,
+               :ISLEM-AY        OF D-ENTSONUC,
+               :ISLEM-GUN       OF D-ENTSONUC,
+               :BOLGE-KODU      OF D-ENTSONUC,
+               :MERKEZ-NO       OF D-ENTSONUC,
+               :SUBE-NO         OF D-ENTSONUC,
+               :SONUC           OF D-ENTSONUC,
+               :SISTEM-YIL      OF D-ENTSONUC,
+               :SISTEM-AY       OF D-ENTSONUC,
+               :SISTEM-GUN      OF D-ENTSONUC,
+               :SISTEM-SAAT     OF D-ENTSONUC)
+       END-EXEC.
+
+      EXEC SQL COMMIT WORK END-EXEC.
+
+ INSERT-SONUC-RAPOR-EXIT.
+        EXIT.
+******************************************************************************
+ ACENTE-YARDIMCI-KART-BUL SECTION.
+
+     MOVE "=YRDKART"                 TO WS-HATA-TABLE-NAME
+     MOVE WS-KURULUS-KODU            TO GMU-KURULUS-KODU   OF D-YRDKART
+*    MOVE BOLGE-KODU  OF D-PTTMRK    TO GMU-BOLGE-KODU     OF D-YRDKART
+*8813 icin degistirdim
+     MOVE WS-ENTEG-BOLGE-KODU(K-SAY) TO GMU-BOLGE-KODU     OF D-YRDKART
+*       move ent-bolge-kodu of d-enteg to gmu-bolge-kodu     of d-yrdkart
+     MOVE IOMERKEZ-NO OF D-OZET      TO GMU-MERKEZ-NO      OF D-YRDKART
+*     MOVE "GT"                       TO GMU-YRD-KART-TIPI  OF D-YRDKART
+     INITIALIZE GMU-YRD-KART-TIPI  OF D-YRDKART
+     IF IOMERKEZ-NO OF D-OZET < 40000
+        MOVE "GT" TO GMU-YRD-KART-TIPI  OF D-YRDKART
+     ELSE
+        MOVE "TE" TO GMU-YRD-KART-TIPI  OF D-YRDKART
+     END-IF
+
+     if GMU-MERKEZ-NO OF D-YRDKART =  50003
+        MOVE 200 TO GMU-BOLGE-KODU     OF D-YRDKART
+    end-if
+
+
+
+*    IF WS-YENI-SUBE-FLAG
+*       MOVE S-ONCEKI-ACENTE-SICIL-NO  TO GMU-YRD-KART-NO    OF D-YRDKART
+*    ELSE
+*       MOVE S-ACENTE-SICIL-NO         TO GMU-YRD-KART-NO    OF D-YRDKART
+*    END-IF
+     MOVE S-ONCEKI-ACENTE-SICIL-NO  TO GMU-YRD-KART-NO    OF D-YRDKART
+
+   EXEC SQL
+     SELECT GMU_YRD_KART_NO
+     INTO :GMU-YRD-KART-NO OF D-YRDKART
+     FROM =YRDKART
+     WHERE GMU_KURULUS_KODU = :GMU-KURULUS-KODU  OF D-YRDKART AND
+             GMU_BOLGE_KODU = :GMU-BOLGE-KODU    OF D-YRDKART AND
+              GMU_MERKEZ_NO = :GMU-MERKEZ-NO     OF D-YRDKART AND
+          GMU_YRD_KART_TIPI = :GMU-YRD-KART-TIPI OF D-YRDKART AND
+            GMU_YRD_KART_NO = :GMU-YRD-KART-NO   OF D-YRDKART
+     BROWSE ACCESS
+   END-EXEC.
+   EVALUATE SQLCODE OF SQLCA
+   WHEN 0
+     CONTINUE
+   WHEN 100
+     MOVE 0 TO SQLCODE OF SQLCA
+     PERFORM ACENTE-YARDIMCI-KART-AC
+   WHEN OTHER
+     PERFORM HATA-VER-WORK-OTHER
+     GO TO ACENTE-YARDIMCI-KART-BUL-EXIT
+   END-EVALUATE.
+
+  ACENTE-YARDIMCI-KART-BUL-EXIT.
+    EXIT.
+****************************************************************************
+  ACENTE-YARDIMCI-KART-AC SECTION.
+
+  MOVE "=YRDKART"                    TO WS-HATA-TABLE-NAME
+  MOVE WS-KURULUS-KODU               TO GMU-KURULUS-KODU      OF D-YRDKART
+* MOVE BOLGE-KODU  OF D-PTTMRK       TO GMU-BOLGE-KODU        OF D-YRDKART
+*  move ent-bolge-kodu of d-enteg     TO GMU-BOLGE-KODU        OF D-YRDKART
+  MOVE WS-ENTEG-BOLGE-KODU(K-SAY)    TO GMU-BOLGE-KODU        OF D-YRDKART
+  MOVE IOMERKEZ-NO OF D-OZET         TO GMU-MERKEZ-NO         OF D-YRDKART
+*  MOVE "GT"                          TO GMU-YRD-KART-TIPI     OF D-YRDKART
+  move GMU-YRD-KART-TIPI  OF D-YRDkarT TO GMU-YRD-KART-TIPI     OF D-YRDKART
+* MOVE S-ACENTE-SICIL-NO             TO GMU-YRD-KART-NO       OF D-YRDKART
+  MOVE S-ONCEKI-ACENTE-SICIL-NO  TO GMU-YRD-KART-NO    OF D-YRDKART
+  MOVE FUNCTION CURRENT-DATE(1:4)    TO GMU-TARIH-YIL         OF D-YRDKART
+  MOVE FUNCTION CURRENT-DATE(5:2)    TO GMU-TARIH-AY          OF D-YRDKART
+  MOVE FUNCTION CURRENT-DATE(7:2)    TO GMU-TARIH-GUN         OF D-YRDKART
+*  MOVE "ACENTE"                      TO GMU-KIMLIK-TURU       OF D-YRDKART
+  MOVE 0                             TO GMU-KIMLIK-NO         OF D-YRDKART
+  MOVE 999888                        TO GMU-EKL-SICIL         OF D-YRDKART
+  MOVE FUNCTION CURRENT-DATE(1:4)    TO GMU-EKL-YIL           OF D-YRDKART
+  MOVE FUNCTION CURRENT-DATE(5:2)    TO GMU-EKL-AY            OF D-YRDKART
+  MOVE FUNCTION CURRENT-DATE(7:2)    TO GMU-EKL-GUN           OF D-YRDKART
+  MOVE FUNCTION CURRENT-DATE(9:8)    TO GMU-EKL-SAAT          OF D-YRDKART
+  MOVE " "                           TO GMU-ACENTE-TURU       OF  D-YRDKART
+  MOVE " "                           TO GMU-KDV-MUK-DURUMU    OF  D-YRDKART
+  MOVE " "                           TO GMU-BIRIMYOL-KDV      OF  D-YRDKART
+  MOVE " "                           TO GMU-EVRENSEL          OF  D-YRDKART
+  MOVE " "                           TO GMU-TEKEL             OF  D-YRDKART
+  MOVE " "                           TO GMU-HGS-BEYIYE-ORAN   OF  D-YRDKART
+  MOVE " "                           TO GMU-PUL-SATMA-DURUM   OF  D-YRDKART
+  MOVE "A"                           TO GMU-AKTIF-PASIF       OF  D-YRDKART
+
+* ng
+* ykart kart ihale-is ve banka-cek bilgileri
+* bos gecilecek.
+* fis ekraninda bu alanlar kart tipi(gb,gt ve ac,vc) icin zorunlu
+* alanlar olmasina ragmen(gonul hanim)
+  MOVE " "                           TO GMU-CEK-TUTAR       OF D-YRDKART
+  MOVE " "                           TO GMU-CEK-YIL         OF D-YRDKART
+  MOVE " "                           TO GMU-CEK-AY          OF D-YRDKART
+  MOVE " "                           TO GMU-CEK-GUN         OF D-YRDKART
+  MOVE -1 TO LEN OF V-IHALE-ADI, V-IND-IHALE-ADI
+  MOVE -1 TO LEN OF V-IS-ADI, V-IND-IS-ADI
+  MOVE -1 TO LEN OF V-BANKA-ADI, V-IND-BANKA-ADI
+  MOVE -1 TO LEN OF V-CEK-NO, V-IND-CEK-NO
+  MOVE -1 TO LEN OF V-CEK-KONU, V-IND-CEK-KONU
+* ng
+
+  STRING S-ACENTE-SICIL-NO DELIMITED BY SIZE
+         " NOLU ACENTEYE AIT YARDIMCI KART" DELIMITED BY SIZE
+    INTO WS-YRDKART-ACIKLAMA
+
+  IF  IOMERKEZ-NO OF D-OZET < 40000
+  MOVE "ACENTE"            TO GMU-KIMLIK-TURU       OF D-YRDKART
+  ELSE
+  MOVE "TAHSILAT ACENTESI" TO GMU-KIMLIK-TURU       OF D-YRDKART
+  END-IF
+
+  IF  IOMERKEZ-NO OF D-OZET < 40000
+  MOVE "030" TO WS-YRDKART-UNVAN
+  ELSE
+  MOVE "031" TO WS-YRDKART-UNVAN
+  END-IF
+
+
+    MOVE 100 TO BCOUNT
+    PERFORM WITH TEST BEFORE
+            UNTIL BCOUNT < 1 OR WS-YRDKART-ACIKLAMA(BCOUNT:1) NOT = " "
+                  SUBTRACT 1 FROM BCOUNT
+    END-PERFORM
+    MOVE 0 TO V-IND-ACIKLAMA
+    MOVE BCOUNT TO LEN OF V-ACIKLAMA
+    MOVE WS-YRDKART-ACIKLAMA(1:BCOUNT) TO VAL OF V-ACIKLAMA.
+
+    MOVE 3 TO LEN OF V-UNVAN
+    MOVE WS-YRDKART-UNVAN(1:3) TO VAL OF V-UNVAN.
+
+    MOVE -1 TO LEN OF V-ADRES, V-IND-ADRES
+    MOVE -1 TO LEN OF V-WEB-ADRESI, V-IND-WEB-ADRESI
+    MOVE -1 TO LEN OF V-MAIL-ADRESI, V-IND-MAIL-ADRESI
+    MOVE -1 TO LEN OF V-DOGUS-SEBEBI, V-IND-DOGUS-SEBEBI
+    MOVE -1 TO LEN OF V-TAKIP-SAFHASI, V-IND-TAKIP-SAFHASI
+    MOVE -1 TO LEN OF V-IRTIBAT-ACKL, V-IND-IRTIBAT-ACKL
+    MOVE -1 TO LEN OF V-REVIZE, V-IND-REVIZE
+
+
+    if GMU-MERKEZ-NO OF D-YRDKART =  50003
+        MOVE 200 TO GMU-BOLGE-KODU     OF D-YRDKART
+    end-if
+
+   EXEC SQL
+      INSERT INTO =YRDKART VALUES (
+           :GMU-KURULUS-KODU               OF  D-YRDKART,
+           :GMU-BOLGE-KODU                 OF  D-YRDKART,
+           :GMU-MERKEZ-NO                  OF  D-YRDKART,
+           :GMU-YRD-KART-NO                OF  D-YRDKART,
+           :GMU-YRD-KART-TIPI              OF  D-YRDKART,
+           :V-ACIKLAMA    INDICATOR :V-IND-ACIKLAMA,
+           :V-IHALE-ADI   INDICATOR :V-IND-IHALE-ADI,
+           :V-IS-ADI      INDICATOR :V-IND-IS-ADI,
+           :V-BANKA-ADI   INDICATOR :V-IND-BANKA-ADI,
+           :V-CEK-NO      INDICATOR :V-IND-CEK-NO,
+           :GMU-CEK-TUTAR                  OF  D-YRDKART,
+           :GMU-CEK-YIL                    OF  D-YRDKART,
+           :GMU-CEK-AY                     OF  D-YRDKART,
+           :GMU-CEK-GUN                    OF  D-YRDKART,
+           :V-CEK-KONU   INDICATOR :V-IND-CEK-KONU,
+           :V-ADRES     INDICATOR :V-IND-ADRES,
+           :GMU-TARIH-YIL                  OF  D-YRDKART,
+           :GMU-TARIH-AY                   OF  D-YRDKART,
+           :GMU-TARIH-GUN                  OF  D-YRDKART,
+           :V-UNVAN     INDICATOR :V-IND-UNVAN,
+           :GMU-KIMLIK-TURU                OF  D-YRDKART,
+           :GMU-KIMLIK-NO                  OF  D-YRDKART,
+           :GMU-ACENTE-TURU                OF  D-YRDKART,
+           :GMU-KDV-MUK-DURUMU             OF  D-YRDKART,
+           :GMU-BIRIMYOL-KDV               OF  D-YRDKART,
+           :GMU-EVRENSEL                   OF  D-YRDKART,
+           :GMU-TEKEL                      OF  D-YRDKART,
+           :GMU-HGS-BEYIYE-ORAN            OF  D-YRDKART,
+           :GMU-PUL-SATMA-DURUM            OF  D-YRDKART,
+           :V-WEB-ADRESI     INDICATOR :V-IND-WEB-ADRESI,
+           :V-MAIL-ADRESI    INDICATOR :V-IND-MAIL-ADRESI,
+           :V-DOGUS-SEBEBI   INDICATOR :V-IND-DOGUS-SEBEBI,
+           :V-TAKIP-SAFHASI  INDICATOR :V-IND-TAKIP-SAFHASI,
+           :GMU-AKTIF-PASIF      OF  D-YRDKART,
+           :V-IRTIBAT-ACKL   INDICATOR :V-IND-IRTIBAT-ACKL,
+           :V-REVIZE         INDICATOR :V-IND-REVIZE,
+           :GMU-EKL-YIL                    OF  D-YRDKART,
+           :GMU-EKL-AY                     OF  D-YRDKART,
+           :GMU-EKL-GUN                    OF  D-YRDKART,
+           :GMU-EKL-SAAT                   OF  D-YRDKART,
+           :GMU-EKL-SICIL                  OF  D-YRDKART)
+
+   END-EXEC.
+   EVALUATE SQLCODE OF SQLCA
+   WHEN 0
+     CONTINUE
+   WHEN -8227
+     PERFORM HATA-VER-WORK-8227
+   WHEN OTHER
+     PERFORM HATA-VER-WORK-OTHER
+   END-EVALUATE.
+
+  ACENTE-YARDIMCI-KART-AC-EXIT.
+    EXIT.
+******************************************************************************
+ HATA-VER-WORK-8227 SECTION.
+
+     MOVE "5990"        TO WS-RESPONSE-CODE
+     MOVE "DUPLICATE"   TO WS-HATA-MESAJI-TIPI
+     MOVE "01"          TO WS-RESPONSE-COUNTER
+     PERFORM HATA-VER-WORK.
+
+ HATA-VER-WORK-8227-EXIT.
+    EXIT.
+******************************************************************************
+ HATA-VER-WORK-100 SECTION.
+
+     MOVE "5990"        TO WS-RESPONSE-CODE
+     MOVE "NOT-FOUND"   TO WS-HATA-MESAJI-TIPI
+     MOVE "01"          TO WS-RESPONSE-COUNTER
+     PERFORM HATA-VER-WORK.
+
+ HATA-VER-WORK-100-EXIT.
+    EXIT.
+******************************************************************************
+ HATA-VER-WORK-OTHER SECTION.
+
+     MOVE "5990"        TO WS-RESPONSE-CODE
+     MOVE "OTHER"       TO WS-HATA-MESAJI-TIPI
+     SET WS-FATAL-ERROR TO TRUE
+     MOVE "01"          TO WS-RESPONSE-COUNTER
+     PERFORM HATA-VER-WORK.
+
+ HATA-VER-WORK-OTHER-EXIT.
+    EXIT.
