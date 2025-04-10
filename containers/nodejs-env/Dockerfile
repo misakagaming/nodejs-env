@@ -10,6 +10,7 @@ ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 # Python Version x.y
 ARG PYTHON_VERSION=3.8
 ARG PYLUCENE_VERSION=7.4.0
+ENV NODE_VERSION=20.10.0
 
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --no-install-recommends \
@@ -82,6 +83,14 @@ RUN node -v
 RUN curl https://raw.githubusercontent.com/creationix/nvm/master/install.sh | bash
 
 RUN source ~/.bashrc
+
+ENV NVM_DIR=/root/.nvm
+RUN . "$NVM_DIR/nvm.sh" && nvm install ${NODE_VERSION}
+RUN . "$NVM_DIR/nvm.sh" && nvm use v${NODE_VERSION}
+RUN . "$NVM_DIR/nvm.sh" && nvm alias default v${NODE_VERSION}
+ENV PATH="/root/.nvm/versions/node/v${NODE_VERSION}/bin/:${PATH}"
+RUN node --version
+RUN npm --version
 
 
 RUN ln -sf $(which python$PYTHON_VERSION) /usr/bin/python
