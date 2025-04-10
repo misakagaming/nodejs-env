@@ -8,7 +8,7 @@ RUN rm /bin/sh && ln -s /bin/bash /bin/sh
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 
 # Python Version x.y
-ARG PYTHON_VERSION=3.8
+ARG PYTHON_VERSION=3.10
 ARG PYLUCENE_VERSION=7.4.0
 ENV NODE_VERSION=20.10.0
 
