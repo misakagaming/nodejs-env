@@ -23,7 +23,7 @@ for file in $(ls $COBOL85_TEST_SRC_DIR/*.CBL | sort); do
         continue
     fi
 
- 	npm run $TREE_SITTER parse $file > $COBOL85_TEST_RESULT_DIR/$FILE_NAME_BODY.txt
+ 	$TREE_SITTER parse $file > $COBOL85_TEST_RESULT_DIR/$FILE_NAME_BODY.txt
  	if [ $? = "0" ]; then
         TEST_SUCCESS_COUNTER=$((TEST_SUCCESS_COUNTER+1))
  		echo $(basename $file) OK | tee -a $COBOL85_TEST_RESULT_SUMMARY
