@@ -92,7 +92,7 @@ ENV PATH="/root/.nvm/versions/node/v${NODE_VERSION}/bin/:${PATH}"
 RUN node --version
 RUN npm --version
 
-RUN npm install tree-sitter-cli@0.24.5
+RUN npm install -g tree-sitter-cli@0.24.5
 
 
 RUN ln -sf $(which python$PYTHON_VERSION) /usr/bin/python
