@@ -195,7 +195,7 @@ RUN ls temp-python/bin
 
 
 
-COPY tree-sitter-cobol-main .
+COPY parsers .
 COPY requirements.txt .
 
 
