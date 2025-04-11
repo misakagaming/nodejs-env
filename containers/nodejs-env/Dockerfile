@@ -92,7 +92,7 @@ ENV PATH="/root/.nvm/versions/node/v${NODE_VERSION}/bin/:${PATH}"
 RUN node --version
 RUN npm --version
 
-RUN npm install -g tree-sitter-cli@0.20.1
+RUN npm install -g tree-sitter-cli@0.24.7
 
 
 RUN ln -sf $(which python$PYTHON_VERSION) /usr/bin/python
@@ -106,64 +106,7 @@ RUN python -m pip install --upgrade pip
 WORKDIR /usr/lib/jvm/default-java/jre/lib
 RUN ln -s ../../lib amd64
 
-# Java 11
-RUN java --version && javac --version
 
-
-# Installing PyLucene
-RUN which ant && ant -version
-
-RUN apt-get install -y --no-install-recommends \
-    libffi-dev \
-    zlib1g-dev
-
-WORKDIR /usr/src/pylucene
-RUN curl https://archive.apache.org/dist/lucene/pylucene/pylucene-$PYLUCENE_VERSION-src.tar.gz | tar -xz
-
-
-
-ENV PREFIX_PYTHON=/usr \
-    JCC_JDK=/usr/lib/jvm/default-java \
-    ANT=ant \
-    JCC='python -m jcc' \
-    NUM_FILES=10 \
-    PYTHON=python \
-    NO_SHARED=1
-	
-
-
-
-
-RUN mkdir -p "/root/.ant/lib"
-
-WORKDIR /root/.ant/lib
-
-COPY ivy-2.4.0.jar .
-
-WORKDIR /usr/src/pylucene
-
-RUN cd "pylucene-$PYLUCENE_VERSION/lucene-java-$PYLUCENE_VERSION/lucene" && \
-    ant ivy-bootstrap && \
-    ant && \
-    cd ../../../
-
-RUN cd "pylucene-$PYLUCENE_VERSION/jcc" && \
-    ls -la && \
-    NO_SHARED=1 JCC_JDK=/usr/lib/jvm/default-java python setup.py build && \
-    NO_SHARED=1 JCC_JDK=/usr/lib/jvm/default-java python setup.py install && \
-    cd .. && \
-    make JCC="python -m jcc" ANT=ant PYTHON=python NUM_FILES=8&& \
-    make install JCC="python -m jcc" ANT=ant PYTHON=python NUM_FILES=8 && \
-    cd ../../
-
-
-WORKDIR /usr/src
-RUN rm -rf pylucene
-
-
-
-
-# ======================== END OF ADDITIONAL INSTALLATION ========================
 
 WORKDIR /app
 COPY . .
